@@ -785,6 +785,34 @@ function showScreen(name) {
   document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
   $("screen-" + name).classList.add("active");
   window.scrollTo(0, 0);
+  if (name === "game") fitWheel();
+}
+
+/* Çarkı, soru paneliyle birlikte ekrana kaydırmadan sığacak boyda çiz */
+function fitWheel() {
+  const scr = $("screen-game");
+  if (!scr.classList.contains("active")) return;
+  const layout = scr.querySelector(".game-layout");
+  const panel = scr.querySelector(".panel");
+  const cs = getComputedStyle(layout);
+  const row = cs.flexDirection === "row";
+  const H = window.innerHeight;
+  const W = document.documentElement.clientWidth;
+  const top = layout.offsetTop - scr.offsetTop; // üst boşluk + üst çubuk + canlı skor
+  const bottom = parseFloat(getComputedStyle(scr).paddingBottom) || 0;
+  const gap = parseFloat(cs.rowGap) || 0;
+  let size;
+  if (row) size = Math.min(H - top - bottom, W * 0.5, 620);
+  else size = Math.min(H - top - bottom - gap - panel.offsetHeight, W - 24, 560);
+  size = Math.max(140, Math.floor(size));
+  scr.style.setProperty("--size", size + "px");
+}
+window.addEventListener("resize", fitWheel);
+if (window.visualViewport) visualViewport.addEventListener("resize", fitWheel);
+if (window.ResizeObserver) {
+  const ro = new ResizeObserver(() => fitWheel());
+  const pn = document.querySelector("#screen-game .panel");
+  if (pn) { ro.observe(pn); ro.observe($("live-board")); }
 }
 
 function renderMenu() {
@@ -800,9 +828,9 @@ function renderMenu() {
     btn.style.setProperty("--i", i);
     const best = p.best[cat.id] || 0;
     const sb = p.sik.best[cat.id] || 0;
-    const recs = [best ? "Rekor: " + best + "/" + LETTERS.length : "", sb ? "Şıklı: " + sb : ""].filter(Boolean).join(" · ");
+    const recs = [best ? "🏆 " + best + "/" + LETTERS.length : "", sb ? "🔤 " + sb : ""].filter(Boolean).join(" · ");
     btn.innerHTML = '<span class="ico">' + cat.icon + '</span><span><div class="name">' + escapeHtml(cat.name) +
-      '</div><div class="best">' + (recs || "Henüz oynanmadı") + "</div>" +
+      '</div><div class="best">' + (recs || "Yeni") + "</div>" +
       '<div class="bar"><i style="--w:' + Math.round((100 * best) / LETTERS.length) + '%"></i></div></span>';
     btn.onclick = () => askMode(cat);
     grid.appendChild(btn);
@@ -957,7 +985,7 @@ function openProfile() {
     sync.textContent = "Misafir rekorları yalnızca bu cihazda tutulur ve liderlik tablosuna girmez.";
     sync.className = "profile-sync local";
   }
-  $("btn-logout").textContent = u.provider === "local" ? "MİSAFİR PROFİLİNİ SİL / ÇIKIŞ" : "ÇIKIŞ YAP";
+  $("btn-logout").textContent = u.provider === "local" ? "PROFİLİ SİL" : "ÇIKIŞ";
   $("avatar-grid").innerHTML = "";
   AVATARS.forEach((a) => {
     const b = document.createElement("button");
@@ -1104,6 +1132,7 @@ function initSettings() {
     el.addEventListener("change", () => store.set(id, el.type === "checkbox" ? el.checked : el.value));
   });
   $("rate-label").textContent = rateLabel($("opt-rate").value);
+  paintTimeChip();
   $("opt-rate").addEventListener("input", () => { $("rate-label").textContent = rateLabel($("opt-rate").value); });
   $("opt-voice").addEventListener("change", () => { store.set("opt-voice", $("opt-voice").value); loadVoices(); testVoice(); });
   $("btn-voice-test").addEventListener("click", testVoice);
@@ -1155,6 +1184,17 @@ $("btn-menu").addEventListener("click", async () => {
   showScreen("menu");
 });
 $("btn-howto").addEventListener("click", () => $("howto").classList.remove("hidden"));
+function paintTimeChip() {
+  const v = +$("opt-time").value;
+  $("time-chip-label").textContent = v ? (v % 60 ? v + " sn" : v / 60 + " dk") : "Süresiz";
+}
+const openSettings = () => $("settings-overlay").classList.remove("hidden");
+$("btn-settings").addEventListener("click", openSettings);
+$("btn-time-chip").addEventListener("click", openSettings);
+$("btn-settings-close").addEventListener("click", () => $("settings-overlay").classList.add("hidden"));
+$("settings-overlay").addEventListener("click", (e) => { if (e.target.id === "settings-overlay") $("settings-overlay").classList.add("hidden"); });
+$("opt-time").addEventListener("change", paintTimeChip);
+paintTimeChip();
 $("btn-howto-close").addEventListener("click", () => $("howto").classList.add("hidden"));
 document.addEventListener("visibilitychange", () => { if (document.hidden && !game.over && !game.paused && !game.online) setPaused(true); });
 

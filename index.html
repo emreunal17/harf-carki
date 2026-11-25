@@ -87,8 +87,10 @@
     </div>
     <ul id="st-best" class="best-list"></ul>
 
-    <button id="btn-profile-save" class="btn btn-ok wide" type="button">KAYDET</button>
-    <button id="btn-logout" class="btn btn-danger wide" type="button">ÇIKIŞ YAP</button>
+    <div class="profile-actions">
+      <button id="btn-logout" class="btn btn-danger" type="button">ÇIKIŞ</button>
+      <button id="btn-profile-save" class="btn btn-ok" type="button">KAYDET</button>
+    </div>
   </section>
 
   <!-- LİDERLİK TABLOSU -->
@@ -106,6 +108,7 @@
 
   <!-- ANA MENÜ -->
   <section id="screen-menu" class="screen">
+    <button id="btn-settings" class="icon-btn settings-btn" type="button" aria-label="Ayarlar">⚙️</button>
     <button id="btn-profile" class="profile-chip" aria-label="Profil">
       <span id="chip-avatar" class="chip-avatar">🙂</span><span id="chip-name">Profil</span>
     </button>
@@ -120,39 +123,8 @@
       <button id="btn-leaderboard" class="lb-btn" type="button">🏆 Liderlik</button>
     </div>
 
-    <h2 class="section-title">Kategori seç</h2>
+    <h2 class="section-title">Kategori seç <button id="btn-time-chip" class="time-chip" type="button" aria-label="Süreyi değiştir">⏱ <span id="time-chip-label">4 dk</span></button></h2>
     <div id="category-grid" class="category-grid"></div>
-
-    <div class="settings">
-      <label class="setting">
-        <span>Süre</span>
-        <select id="opt-time">
-          <option value="300">🐣 Acemi · 5 dk</option>
-          <option value="240" selected>🌱 Başlangıç · 4 dk</option>
-          <option value="180">⚡ Orta · 3 dk</option>
-          <option value="120">🔥 Usta · 2 dk</option>
-          <option value="90">👑 Efsane · 90 sn</option>
-          <option value="0">☕ Rahat · Süresiz</option>
-        </select>
-      </label>
-      <label class="setting toggle">
-        <span>Soruları sesli oku</span>
-        <input type="checkbox" id="opt-tts" checked />
-        <i></i>
-      </label>
-      <div class="setting voice-row" id="voice-row">
-        <span>Okuyan ses</span>
-        <div class="voice-ctl">
-          <select id="opt-voice"></select>
-          <button id="btn-voice-test" type="button" class="chip-btn">▶ Dinle</button>
-        </div>
-      </div>
-      <label class="setting">
-        <span>Okuma hızı <small id="rate-label">Normal</small></span>
-        <input type="range" id="opt-rate" min="0.75" max="1.25" step="0.05" value="0.95" />
-      </label>
-      <p id="voice-tip" class="voice-tip"></p>
-    </div>
 
     <button id="btn-howto" class="link-btn">Nasıl oynanır?</button>
     <p id="voice-warning" class="voice-warning hidden"></p>
@@ -263,10 +235,10 @@
         <div id="heard" class="heard"></div>
 
         <div class="actions">
+          <button id="btn-repeat" type="button" class="btn-repeat" aria-label="Soruyu tekrar oku" title="Soruyu tekrar oku">🔊</button>
           <button id="btn-pass" type="button" class="btn btn-pass">PAS</button>
           <button id="btn-submit" type="button" class="btn btn-ok">CEVAPLA</button>
         </div>
-        <button id="btn-repeat" type="button" class="link-btn small">🔊 Soruyu tekrar oku</button>
       </div>
     </div>
 
@@ -325,6 +297,43 @@
   </div>
 
   <!-- NASIL OYNANIR -->
+  <div id="settings-overlay" class="overlay hidden" role="dialog" aria-labelledby="settings-title">
+    <div class="overlay-card settings-card">
+      <h2 id="settings-title">⚙️ Ayarlar</h2>
+      <div class="settings">
+        <label class="setting">
+          <span>Süre</span>
+          <select id="opt-time">
+            <option value="300">🐣 Acemi · 5 dk</option>
+            <option value="240" selected>🌱 Başlangıç · 4 dk</option>
+            <option value="180">⚡ Orta · 3 dk</option>
+            <option value="120">🔥 Usta · 2 dk</option>
+            <option value="90">👑 Efsane · 90 sn</option>
+            <option value="0">☕ Rahat · Süresiz</option>
+          </select>
+        </label>
+        <label class="setting toggle">
+          <span>Soruları sesli oku</span>
+          <input type="checkbox" id="opt-tts" checked />
+          <i></i>
+        </label>
+        <div class="setting voice-row" id="voice-row">
+          <span>Okuyan ses</span>
+          <div class="voice-ctl">
+            <select id="opt-voice"></select>
+            <button id="btn-voice-test" type="button" class="chip-btn">▶ Dinle</button>
+          </div>
+        </div>
+        <label class="setting">
+          <span>Okuma hızı <small id="rate-label">Normal</small></span>
+          <input type="range" id="opt-rate" min="0.75" max="1.25" step="0.05" value="0.95" />
+        </label>
+        <p id="voice-tip" class="voice-tip"></p>
+      </div>
+      <button id="btn-settings-close" class="btn btn-ok wide" type="button">TAMAM</button>
+    </div>
+  </div>
+
   <div id="howto" class="overlay hidden">
     <div class="overlay-card howto">
       <h2>Nasıl oynanır?</h2>
