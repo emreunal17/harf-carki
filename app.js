@@ -18,6 +18,17 @@ function getProfile() {
   return { ...p, name: p.name || u.name || "Oyuncu", avatar: p.avatar || "🙂", games: p.games || 0, correct: p.correct || 0, answered: p.answered || 0, best: p.best || {}, photo: p.photo || "", sik: p.sik || { games: 0, correct: 0, answered: 0, best: {} } };
 }
 function saveProfile(p) { store.set(profileKey(), p); }
+// Eskiden ayrı tutulan şıklı istatistikleri bir kez ana profile ekle
+function mergeSik() {
+  const p = getProfile();
+  if (p.sikMerged) return;
+  const k = p.sik || {};
+  p.games += k.games || 0; p.correct += k.correct || 0; p.answered += k.answered || 0;
+  Object.entries(k.best || {}).forEach(([id, v]) => { p.best[id] = Math.max(p.best[id] || 0, v); });
+  p.sik = { games: 0, correct: 0, answered: 0, best: {} };
+  p.sikMerged = true;
+  saveProfile(p);
+}
 
 // Profil fotoğrafı: küçültülmüş JPEG (data URL) ya da emoji avatar
 const validPhoto = (s) => typeof s === "string" && s.length < 60000 && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(s);
@@ -755,7 +766,7 @@ function endGame(title) {
   $("btn-result-lb").classList.remove("hidden");
   const p = getProfile();
   const sik = game.mode === "choice";
-  const st = sik ? p.sik : p;
+  const st = p; // şıklı oyunlar da ana rekorlara ve liderlik tablosuna sayılır
   st.games += 1; st.correct += c; st.answered += game.items.length;
   const tag = sik ? " · Şıklı" : "";
   const best = st.best[game.cat.id] || 0;
@@ -770,7 +781,7 @@ function endGame(title) {
   else $("res-best").textContent = "Rekorun: " + best + " doğru (" + game.cat.name + tag + ") · Seviye: " + game.level;
   if (typeof Extras !== "undefined") Extras.afterSolo(p, { c, w, e, n: game.items.length });
   saveProfile(p);
-  if (!sik) Cloud.push(p);
+  Cloud.push(p);
 
   renderResultList();
   showScreen("result");
@@ -1048,6 +1059,7 @@ function afterLogin() {
   if (!u) { setupLoginScreen(); showScreen("login"); return; }
   const p = getProfile();
   if (!store.get(profileKey(), null)) saveProfile(p); // ilk girişte profil oluştur
+  mergeSik();
   renderMenu();
   showScreen("menu");
   Cloud.pull().then(renderMenu);
