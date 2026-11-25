@@ -909,8 +909,8 @@ function buildLogoWheels() {
       const a = (-90 + (360 / n) * i) * (Math.PI / 180);
       const b = document.createElement("span");
       b.className = "lw-b" + (marks[i] ? " " + marks[i] : "");
-      b.style.left = 50 + 45.5 * Math.cos(a) + "%";
-      b.style.top = 50 + 45.5 * Math.sin(a) + "%";
+      b.style.left = 50 + 45 * Math.cos(a) + "%";
+      b.style.top = 50 + 45 * Math.sin(a) + "%";
       b.style.setProperty("--i", i);
       const t = document.createElement("i"); t.textContent = L;
       b.appendChild(t);

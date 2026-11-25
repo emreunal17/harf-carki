@@ -35,6 +35,7 @@
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
+html { scrollbar-gutter: stable; overflow-x: hidden; }
 html, body {
   margin: 0;
   min-height: 100%;
@@ -213,9 +214,10 @@ button { cursor: pointer; border: 0; background: none; }
 
 .wheel-wrap { width: var(--size); height: var(--size); flex: none; position: relative; }
 .wheel { position: relative; width: 100%; height: 100%; }
-/* yürüyen ışıklar halkası */
-.wheel::before {
-  content: ""; position: absolute; inset: 0.5%; border-radius: 50%;
+/* yürüyen ışıklar halkası (dönen öğe taşmasın diye yuvarlak, kırpan kabın içinde) */
+.chase-clip { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; pointer-events: none; }
+.chase {
+  position: absolute; inset: 0.5%; border-radius: 50%;
   background: repeating-conic-gradient(from 0deg, rgba(255,178,46,.9) 0 1.2deg, transparent 1.2deg 6deg);
   -webkit-mask: radial-gradient(circle, transparent 69%, #000 69.5%, #000 71%, transparent 71.5%);
           mask: radial-gradient(circle, transparent 69%, #000 69.5%, #000 71%, transparent 71.5%);
@@ -640,15 +642,17 @@ button { cursor: pointer; border: 0; background: none; }
   background: radial-gradient(circle at 40% 32%, var(--amber-hot), var(--amber) 60%, var(--amber-deep));
 }
 .choice-text { flex: 1; }
-.choice.right { border-color: var(--green); background: color-mix(in srgb, var(--green) 18%, var(--stage-2)); animation: pop .5s var(--ease-out); }
+.choice.right { border-color: var(--green); background: color-mix(in srgb, var(--green) 18%, var(--stage-2)); animation: choice-ok .45s var(--ease-out); }
 .choice.right .choice-key { background: var(--green); color: #04261a; }
-.choice.wrong { border-color: var(--red); background: color-mix(in srgb, var(--red) 18%, var(--stage-2)); animation: wobble .45s; }
+.choice.wrong { border-color: var(--red); background: color-mix(in srgb, var(--red) 18%, var(--stage-2)); animation: choice-bad .4s; }
+@keyframes choice-ok { 40% { transform: scale(1.03); } }
+@keyframes choice-bad { 25% { transform: translateX(-6px); } 50% { transform: translateX(5px); } 75% { transform: translateX(-3px); } }
 .choice.wrong .choice-key { background: var(--red); color: #fff; }
 .choice.dim { opacity: .4; }
 .panel[data-mode="choice"] .actions { margin-top: 8px; }
 
 /* ---------- LOGO: dönen mini harf çarkı ---------- */
-.logo-wheel { --s: clamp(160px, 46vw, 200px); position: relative; width: var(--s); height: var(--s); margin: 0 auto 12px; }
+.logo-wheel { --s: clamp(160px, 46vw, 200px); position: relative; border-radius: 50%; overflow: hidden; width: var(--s); height: var(--s); margin: 0 auto 12px; }
 .logo-wheel::before {
   content: ""; position: absolute; inset: 6%; border-radius: 50%;
   background: radial-gradient(circle, rgba(255,178,46,.16), transparent 70%);
