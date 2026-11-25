@@ -5,6 +5,7 @@ const Auth = (() => {
   const FB_VER = "10.12.2";
   const LS = "harfcarki.";
   let fbAuth = null;
+  let fbDb = null;
   let user = null; // { uid, name, email, provider }
   const listeners = [];
 
@@ -56,8 +57,10 @@ const Auth = (() => {
       try {
         await loadScript(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-app-compat.js`);
         await loadScript(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-auth-compat.js`);
+        await loadScript(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-firestore-compat.js`);
         firebase.initializeApp(cfg);
         fbAuth = firebase.auth();
+        try { fbDb = firebase.firestore(); } catch (e) { console.warn("Firestore başlatılamadı:", e); }
         fbAuth.languageCode = "tr";
         try { await fbAuth.getRedirectResult(); } catch (e) { console.warn(e); }
         await new Promise((resolve) => {
@@ -131,6 +134,7 @@ const Auth = (() => {
     init, social, emailLogin, emailRegister, resetPassword, guest, logout,
     get user() { return user; },
     get enabled() { return !!fbAuth; },
+    get db() { return fbDb; },
     onChange(fn) { listeners.push(fn); },
   };
 })();

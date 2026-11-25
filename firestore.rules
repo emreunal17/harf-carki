@@ -1,0 +1,48 @@
+rules_version = '2';
+// Harf Çarkı — Firestore güvenlik kuralları
+// users/{uid}: { name, avatar, games, correct, answered, best: {kategori: doğru sayısı}, updatedAt }
+// E-posta ya da başka kişisel bilgi tutulmaz; liderlik tablosu için herkes okuyabilir.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function bestValue(b, k) {
+      return !(k in b) || (b[k] is int && b[k] >= 0 && b[k] <= 28);
+    }
+
+    function bestOk(b) {
+      return b is map
+        && b.keys().hasOnly(['genel', 'spor', 'sinema', 'tarih', 'bilim', 'muzik', 'edebiyat', 'mutfak', 'karisik'])
+        && bestValue(b, 'genel') && bestValue(b, 'spor') && bestValue(b, 'sinema')
+        && bestValue(b, 'tarih') && bestValue(b, 'bilim') && bestValue(b, 'muzik')
+        && bestValue(b, 'edebiyat') && bestValue(b, 'mutfak') && bestValue(b, 'karisik');
+    }
+
+    function valid(d) {
+      return d.keys().hasOnly(['name', 'avatar', 'games', 'correct', 'answered', 'best', 'updatedAt'])
+        && d.keys().hasAll(['name', 'avatar', 'games', 'correct', 'answered', 'best', 'updatedAt'])
+        && d.name is string && d.name.size() >= 1 && d.name.size() <= 20
+        && d.avatar is string && d.avatar.size() >= 1 && d.avatar.size() <= 16
+        && d.games is int && d.games >= 0 && d.games <= 100000
+        && d.answered is int && d.answered >= 0 && d.answered <= d.games * 28
+        && d.correct is int && d.correct >= 0 && d.correct <= d.answered
+        && bestOk(d.best)
+        && d.updatedAt == request.time;
+    }
+
+    match /users/{uid} {
+      allow get: if true;
+      allow list: if request.query.limit <= 50;
+      allow create: if isOwner(uid) && valid(request.resource.data);
+      // Bir kayıtta en fazla 5 oyunluk artış (çevrimdışı oynanıp sonra gönderilen oyunlar için pay)
+      allow update: if isOwner(uid) && valid(request.resource.data)
+        && request.resource.data.games >= resource.data.games
+        && request.resource.data.games <= resource.data.games + 5
+        && request.resource.data.answered - resource.data.answered <= 5 * 28;
+      allow delete: if isOwner(uid);
+    }
+  }
+}

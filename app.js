@@ -21,6 +21,74 @@ function getProfile() {
 }
 function saveProfile(p) { store.set(profileKey(), p); }
 
+/* ================= BULUT (Firestore) ================= */
+const CAT_IDS = () => [...CATEGORIES.map((c) => c.id), "karisik"];
+const Cloud = {
+  status: "local", // local | synced | error
+  enabled() { return !!(Auth.db && Auth.user && Auth.user.provider !== "local"); },
+  ref() { return Auth.db.collection("users").doc(Auth.user.uid); },
+  clean(p) {
+    const best = {};
+    CAT_IDS().forEach((id) => { const v = p.best[id]; if (Number.isInteger(v) && v > 0) best[id] = Math.min(28, v); });
+    const games = Math.max(0, p.games | 0);
+    const answered = Math.min(Math.max(0, p.answered | 0), games * 28);
+    return {
+      name: (String(p.name || "Oyuncu").trim() || "Oyuncu").slice(0, 20),
+      avatar: String(p.avatar || "🙂").slice(0, 8),
+      games, answered,
+      correct: Math.min(Math.max(0, p.correct | 0), answered),
+      best,
+    };
+  },
+  // Girişte buluttaki kaydı çek, cihazdakiyle birleştir
+  async pull() {
+    if (!this.enabled()) { this.status = "local"; return; }
+    try {
+      const snap = await this.ref().get();
+      const local = getProfile();
+      let merged = local;
+      if (snap.exists) {
+        const c = snap.data();
+        const useCloud = (c.games || 0) >= local.games;
+        const best = { ...(c.best || {}) };
+        Object.entries(local.best).forEach(([k, v]) => { best[k] = Math.max(best[k] || 0, v); });
+        merged = {
+          name: c.name || local.name,
+          avatar: c.avatar || local.avatar,
+          games: useCloud ? c.games : local.games,
+          correct: useCloud ? c.correct : local.correct,
+          answered: useCloud ? c.answered : local.answered,
+          best,
+        };
+      }
+      saveProfile(merged);
+      await this.push(merged, snap.exists ? snap.data() : null);
+    } catch (e) {
+      console.warn("Bulut okunamadı:", e);
+      this.status = "error";
+    }
+  },
+  async push(p, current) {
+    if (!this.enabled()) { this.status = "local"; return; }
+    const data = this.clean(p);
+    try {
+      if (current === undefined) { const snap = await this.ref().get(); current = snap.exists ? snap.data() : null; }
+      // Kurallar tek seferde en fazla 5 oyunluk artışa izin verir
+      if (current && data.games > (current.games || 0) + 5) {
+        const step = (current.games || 0) + 5;
+        data.answered = Math.min(data.answered, (current.answered || 0) + 5 * 28, step * 28);
+        data.correct = Math.min(data.correct, data.answered);
+        data.games = step;
+      }
+      await this.ref().set({ ...data, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+      this.status = "synced";
+    } catch (e) {
+      console.warn("Buluta yazılamadı:", e);
+      this.status = "error";
+    }
+  },
+};
+
 /* ================= METİN EŞLEŞTİRME ================= */
 const lower = (s) => s.toLocaleLowerCase("tr-TR");
 function normalize(s) {
@@ -408,6 +476,7 @@ function endGame(title) {
   if (c > best) { p.best[game.cat.id] = c; $("res-best").textContent = "🎉 Yeni rekor! (" + game.cat.name + " · " + game.level + ")"; }
   else $("res-best").textContent = "Rekorun: " + best + " doğru (" + game.cat.name + ") · Seviye: " + game.level;
   saveProfile(p);
+  Cloud.push(p);
 
   $("result-list").innerHTML = game.items.map((it) =>
     '<li class="' + it.status + '"><div class="rl">' + it.letter + "</div><div>" +
@@ -459,6 +528,14 @@ function openProfile() {
   $("profile-name").value = p.name;
   const how = { google: "Google hesabı", facebook: "Facebook hesabı", email: "E-posta hesabı", local: "Misafir · yalnızca bu cihazda" }[u.provider] || "";
   $("profile-account").textContent = how + (u.email ? " · " + u.email : "");
+  const sync = $("profile-sync");
+  if (Cloud.enabled()) {
+    sync.textContent = Cloud.status === "error" ? "⚠ Hesaba kaydedilemedi, internet bağlantını kontrol et" : "☁ Rekorların hesabına kaydediliyor · Adın ve avatarın liderlik tablosunda görünür";
+    sync.className = "profile-sync" + (Cloud.status === "error" ? " local" : "");
+  } else {
+    sync.textContent = "Misafir rekorları yalnızca bu cihazda tutulur ve liderlik tablosuna girmez.";
+    sync.className = "profile-sync local";
+  }
   $("btn-logout").textContent = u.provider === "local" ? "MİSAFİR PROFİLİNİ SİL / ÇIKIŞ" : "ÇIKIŞ YAP";
   $("avatar-grid").innerHTML = "";
   AVATARS.forEach((a) => {
@@ -515,6 +592,77 @@ function afterLogin() {
   if (!store.get(profileKey(), null)) saveProfile(p); // ilk girişte profil oluştur
   renderMenu();
   showScreen("menu");
+  Cloud.pull().then(renderMenu);
+}
+
+/* ---------- Liderlik tablosu ---------- */
+let lbTab = "toplam";
+let lbToken = 0;
+function lbTabs() {
+  return [{ id: "toplam", name: "⭐ Toplam doğru" }, ...CATEGORIES.map((c) => ({ id: c.id, name: c.icon + " " + c.name })), { id: MIXED.id, name: MIXED.icon + " " + MIXED.name }];
+}
+function openLeaderboard(tab) {
+  if (tab) lbTab = tab;
+  const wrap = $("lb-tabs");
+  wrap.innerHTML = "";
+  lbTabs().forEach((t) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = t.name; b.setAttribute("role", "tab");
+    if (t.id === lbTab) { b.classList.add("sel"); b.setAttribute("aria-selected", "true"); }
+    b.onclick = () => openLeaderboard(t.id);
+    wrap.appendChild(b);
+  });
+  showScreen("leaderboard");
+  const sel = wrap.querySelector(".sel"); if (sel) sel.scrollIntoView({ inline: "center", block: "nearest" });
+  loadLeaderboard();
+}
+async function loadLeaderboard() {
+  const list = $("lb-list");
+  const myToken = ++lbToken;
+  $("lb-caption").textContent = lbTab === "toplam" ? "Bütün oyunlarda bilinen toplam doğru sayısı" : "Bu kategoride tek oyunda en çok doğru (28 üzerinden)";
+  const guest = !Auth.user || Auth.user.provider === "local";
+  $("lb-note").textContent = guest ? "Misafirler tabloda görünmez. Tabloya girmek için profilinden çıkıp e-posta ile hesap aç." : "";
+  if (!Auth.db) {
+    list.innerHTML = '<li class="empty">Liderlik tablosu şu an kullanılamıyor.</li>';
+    return;
+  }
+  list.innerHTML = '<li class="empty">Yükleniyor…</li>';
+  const field = lbTab === "toplam" ? "correct" : "best." + lbTab;
+  try {
+    const snap = await Auth.db.collection("users").orderBy(field, "desc").limit(20).get();
+    if (myToken !== lbToken) return;
+    const myId = Auth.user && Auth.user.uid;
+    const rows = [];
+    snap.forEach((doc) => {
+      const d = doc.data();
+      const score = lbTab === "toplam" ? d.correct : (d.best || {})[lbTab];
+      if (!score) return;
+      rows.push({ id: doc.id, name: d.name, avatar: d.avatar, score, games: d.games });
+    });
+    list.innerHTML = "";
+    if (!rows.length) { list.innerHTML = '<li class="empty">Henüz kimse yok. İlk sen ol! 🚀</li>'; return; }
+    const medals = ["🥇", "🥈", "🥉"];
+    rows.forEach((r, i) => {
+      const li = document.createElement("li");
+      if (r.id === myId) li.classList.add("me");
+      const rank = document.createElement("span"); rank.className = "lb-rank"; rank.textContent = medals[i] || String(i + 1);
+      const ava = document.createElement("span"); ava.className = "lb-ava"; ava.textContent = r.avatar || "🙂";
+      const name = document.createElement("span"); name.className = "lb-name";
+      name.textContent = (r.name || "Oyuncu") + (r.id === myId ? " (sen)" : "");
+      const small = document.createElement("small"); small.textContent = (r.games || 0) + " oyun"; name.appendChild(small);
+      const score = document.createElement("span"); score.className = "lb-score"; score.textContent = r.score;
+      li.append(rank, ava, name, score);
+      list.appendChild(li);
+    });
+    if (myId && !guest && !rows.some((r) => r.id === myId)) {
+      const p = getProfile();
+      const mine = lbTab === "toplam" ? p.correct : (p.best[lbTab] || 0);
+      $("lb-note").textContent = "İlk 20'de değilsin. Senin skorun: " + mine;
+    }
+  } catch (e) {
+    console.warn(e);
+    if (myToken === lbToken) list.innerHTML = '<li class="empty">Tablo yüklenemedi. İnternet bağlantını kontrol edip ↻ ile yenile.</li>';
+  }
 }
 
 /* ---------- Ayarlar ---------- */
@@ -570,6 +718,12 @@ $("btn-howto").addEventListener("click", () => $("howto").classList.remove("hidd
 $("btn-howto-close").addEventListener("click", () => $("howto").classList.add("hidden"));
 document.addEventListener("visibilitychange", () => { if (document.hidden && !game.over && !game.paused) setPaused(true); });
 
+// Liderlik
+$("btn-leaderboard").addEventListener("click", () => openLeaderboard());
+$("btn-result-lb").addEventListener("click", () => openLeaderboard(game.cat ? game.cat.id : "toplam"));
+$("btn-lb-back").addEventListener("click", () => showScreen("menu"));
+$("btn-lb-refresh").addEventListener("click", loadLeaderboard);
+
 // Profil
 $("btn-profile").addEventListener("click", openProfile);
 $("btn-profile-back").addEventListener("click", () => showScreen("menu"));
@@ -578,6 +732,7 @@ $("btn-profile-save").addEventListener("click", () => {
   p.name = $("profile-name").value.trim().slice(0, 20) || p.name;
   p.avatar = pendingAvatar || p.avatar;
   saveProfile(p);
+  Cloud.push(p);
   renderMenu();
   showScreen("menu");
 });
