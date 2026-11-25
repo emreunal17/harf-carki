@@ -377,6 +377,7 @@ function renderWheel() {
     const b = document.createElement("div");
     b.className = "bubble";
     b.id = "b-" + i;
+    b.style.setProperty("--i", i);
     b.textContent = it.letter;
     b.style.left = 50 + 45 * Math.cos(ang) + "%";
     b.style.top = 50 + 45 * Math.sin(ang) + "%";
@@ -385,12 +386,74 @@ function renderWheel() {
 }
 function paintBubbles() {
   game.items.forEach((it, i) => {
-    $("b-" + i).className = "bubble" + (it.status !== "pending" ? " " + it.status : "") + (i === game.idx && !game.over ? " current" : "");
+    $("b-" + i).className = "bubble" + (it.status !== "pending" ? " " + it.status : "") + (i === game.idx && !game.over && !game.busy ? " current" : "");
   });
   const c = (s) => game.items.filter((it) => it.status === s).length;
-  $("cnt-correct").textContent = c("correct");
-  $("cnt-wrong").textContent = c("wrong");
-  $("cnt-pass").textContent = c("passed");
+  setCount("cnt-correct", c("correct"));
+  setCount("cnt-wrong", c("wrong"));
+  setCount("cnt-pass", c("passed"));
+}
+
+function setCount(id, n) {
+  const el = $(id);
+  if (el.textContent !== String(n)) {
+    el.textContent = n;
+    el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump");
+  }
+}
+// Animasyonu baştan oynat
+function replay(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
+const reducedMotion = () => window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// Doğru cevapta harf ampulünden kıvılcım saç
+function sparks(i, color) {
+  if (reducedMotion()) return;
+  const b = $("b-" + i);
+  if (!b) return;
+  const wheel = $("wheel");
+  for (let k = 0; k < 14; k++) {
+    const sp = document.createElement("span");
+    sp.className = "spark";
+    const ang = (Math.PI * 2 * k) / 14 + Math.random() * 0.4;
+    const dist = 26 + Math.random() * 34;
+    sp.style.left = b.style.left; sp.style.top = b.style.top;
+    sp.style.setProperty("--dx", Math.cos(ang) * dist + "px");
+    sp.style.setProperty("--dy", Math.sin(ang) * dist + "px");
+    sp.style.setProperty("--sc", color);
+    wheel.appendChild(sp);
+    setTimeout(() => sp.remove(), 800);
+  }
+}
+
+// Ekranın üstünden konfeti yağdır
+function confetti(n = 70) {
+  if (reducedMotion()) return;
+  const colors = ["#ffb22e", "#ffd36b", "#2ed69b", "#4fa8ff", "#ff5b4f", "#f6eedb"];
+  for (let k = 0; k < n; k++) {
+    const c = document.createElement("i");
+    c.className = "confetti";
+    c.style.left = Math.random() * 100 + "vw";
+    c.style.background = colors[k % colors.length];
+    c.style.setProperty("--dx", (Math.random() * 160 - 80) + "px");
+    c.style.setProperty("--r", (Math.random() * 900 - 450) + "deg");
+    c.style.animationDuration = 1.8 + Math.random() * 1.6 + "s";
+    c.style.animationDelay = Math.random() * 0.5 + "s";
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 4200);
+  }
+}
+
+// Sayıyı 0'dan hedefe doğru say
+function countUp(el, to, ms = 700) {
+  if (reducedMotion() || !to) { el.textContent = to; return; }
+  const t0 = performance.now();
+  const step = (t) => {
+    const k = Math.min(1, (t - t0) / ms);
+    el.textContent = Math.round(to * (1 - Math.pow(1 - k, 3)));
+    if (k < 1) requestAnimationFrame(step);
+  };
+  el.textContent = 0;
+  requestAnimationFrame(step);
 }
 
 function startGame(cat) {
@@ -423,10 +486,14 @@ function tick() {
 }
 function updateTimer() {
   const el = $("timer");
-  if (!game.total) { el.textContent = "∞"; el.classList.remove("low"); return; }
+  const center = $("wheel-center");
+  center.classList.toggle("free", !game.total);
+  if (!game.total) { el.textContent = "∞"; el.classList.remove("low"); center.classList.remove("low"); return; }
   const t = Math.max(0, game.time);
   el.textContent = Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0");
   el.classList.toggle("low", t <= 15);
+  center.classList.toggle("low", t <= 15);
+  $("timer-ring").setAttribute("stroke-dashoffset", String(100 - (100 * t) / game.total));
 }
 
 function showQuestion() {
@@ -434,10 +501,11 @@ function showQuestion() {
   game.turn++;
   game.busy = false;
   const rule = it.q.c ? "İçinde " + it.letter + " var" : "Baş harfi " + it.letter;
-  $("current-letter").textContent = it.letter;
+  const letterEl = $("current-letter");
+  if (letterEl.textContent !== it.letter) { letterEl.textContent = it.letter; replay(letterEl, "flip"); }
   $("letter-rule").textContent = it.q.c ? "içinde var" : "baş harfi";
   $("question").innerHTML = '<span class="rule">' + escapeHtml(rule.toLocaleUpperCase("tr-TR") +
-    (game.cat.id === MIXED.id ? " · " + it.q.cat : "")) + "</span>" + escapeHtml(it.q.q);
+    (game.cat.id === MIXED.id ? " · " + it.q.cat : "")) + "</span>" + it.q.q.split(/\s+/).map((w, i) => '<span class="w" style="--i:' + i + '">' + escapeHtml(w) + "</span>").join(" ");
   $("answer").value = "";
   $("heard").textContent = "";
   paintBubbles();
@@ -461,6 +529,7 @@ function submit(text) {
   if (isCorrect(answer, it.q)) {
     it.status = "correct";
     beep("ok");
+    sparks(game.idx, "#2ed69b");
     flash("✔ Doğru! " + it.q.a, "ok");
   } else {
     it.status = "wrong";
@@ -528,20 +597,24 @@ function endGame(title) {
   const w = game.items.filter((i) => i.status === "wrong").length;
   const e = game.items.length - c - w;
   $("result-title").textContent = c === game.items.length ? "🏆 Kusursuz! Tüm harfler doğru!" : (title || "Oyun bitti!");
-  $("res-correct").textContent = c;
-  $("res-wrong").textContent = w;
-  $("res-empty").textContent = e;
+  setTimeout(() => { countUp($("res-correct"), c); countUp($("res-wrong"), w); countUp($("res-empty"), e); }, 250);
+  $("res-best").classList.remove("record");
 
   const p = getProfile();
   p.games += 1; p.correct += c; p.answered += game.items.length;
   const best = p.best[game.cat.id] || 0;
-  if (c > best) { p.best[game.cat.id] = c; $("res-best").textContent = "🎉 Yeni rekor! (" + game.cat.name + " · " + game.level + ")"; }
+  if (c > best) {
+    p.best[game.cat.id] = c;
+    $("res-best").textContent = "🎉 Yeni rekor! (" + game.cat.name + " · " + game.level + ")";
+    $("res-best").classList.add("record");
+    setTimeout(() => confetti(c === game.items.length ? 140 : 70), 400);
+  }
   else $("res-best").textContent = "Rekorun: " + best + " doğru (" + game.cat.name + ") · Seviye: " + game.level;
   saveProfile(p);
   Cloud.push(p);
 
-  $("result-list").innerHTML = game.items.map((it) =>
-    '<li class="' + it.status + '"><div class="rl">' + it.letter + "</div><div>" +
+  $("result-list").innerHTML = game.items.map((it, i) =>
+    '<li class="' + it.status + '" style="--i:' + i + '"><div class="rl">' + it.letter + "</div><div>" +
     '<div class="rq">' + escapeHtml(it.q.q) + "</div>" +
     '<div class="ra">' + escapeHtml(it.q.a) + "</div>" +
     (it.status === "wrong" ? '<div class="ry">Senin cevabın: ' + escapeHtml(it.given) + "</div>" : "") +
@@ -568,13 +641,15 @@ function renderMenu() {
   $("chip-name").textContent = p.name;
   const grid = $("category-grid");
   grid.innerHTML = "";
-  [...CATEGORIES, MIXED].forEach((cat) => {
+  [...CATEGORIES, MIXED].forEach((cat, i) => {
     const btn = document.createElement("button");
     btn.className = "cat-card";
     btn.style.setProperty("--c", cat.color);
+    btn.style.setProperty("--i", i);
     const best = p.best[cat.id] || 0;
     btn.innerHTML = '<span class="ico">' + cat.icon + '</span><span><div class="name">' + escapeHtml(cat.name) +
-      '</div><div class="best">' + (best ? "Rekor: " + best + "/" + LETTERS.length : "Henüz oynanmadı") + "</div></span>";
+      '</div><div class="best">' + (best ? "Rekor: " + best + "/" + LETTERS.length : "Henüz oynanmadı") + "</div>" +
+      '<div class="bar"><i style="--w:' + Math.round((100 * best) / LETTERS.length) + '%"></i></div></span>';
     btn.onclick = () => askMode(cat);
     grid.appendChild(btn);
   });

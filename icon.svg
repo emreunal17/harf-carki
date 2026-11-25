@@ -1,12 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#14123a"/>
-  <g font-family="Arial, Helvetica, sans-serif" font-weight="900" text-anchor="middle">
-    <circle cx="256" cy="92" r="40" fill="#3d7bff"/><text x="256" y="108" font-size="44" fill="#fff">A</text>
-    <circle cx="398" cy="174" r="40" fill="#1fc16b"/><text x="398" y="190" font-size="44" fill="#fff">B</text>
-    <circle cx="398" cy="338" r="40" fill="#ffc23d"/><text x="398" y="354" font-size="44" fill="#3a2a00">C</text>
-    <circle cx="256" cy="420" r="40" fill="#3d7bff"/><text x="256" y="436" font-size="44" fill="#fff">Ç</text>
-    <circle cx="114" cy="338" r="40" fill="#ff4d5e"/><text x="114" y="354" font-size="44" fill="#fff">D</text>
-    <circle cx="114" cy="174" r="40" fill="#3d7bff"/><text x="114" y="190" font-size="44" fill="#fff">E</text>
-    <text x="256" y="300" font-size="130" fill="#fff">?</text>
+  <defs>
+    <radialGradient id="lit" cx="40%" cy="32%" r="70%">
+      <stop offset="0" stop-color="#fff1c4"/><stop offset=".45" stop-color="#ffd36b"/><stop offset=".8" stop-color="#ffb22e"/><stop offset="1" stop-color="#c97a00"/>
+    </radialGradient>
+    <radialGradient id="off" cx="40%" cy="32%" r="70%">
+      <stop offset="0" stop-color="#3a4170"/><stop offset="1" stop-color="#1a1f3d"/>
+    </radialGradient>
+    <radialGradient id="spot" cx="50%" cy="0%" r="80%">
+      <stop offset="0" stop-color="#3a2c1a"/><stop offset="1" stop-color="#0a0c18"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="104" fill="url(#spot)"/>
+  <circle cx="256" cy="256" r="176" fill="none" stroke="#ffb22e" stroke-opacity=".35" stroke-width="4" stroke-dasharray="3 14"/>
+  <g font-family="Arial Black, Arial, sans-serif" font-weight="900" text-anchor="middle" font-size="40">
+    <circle cx="256" cy="96" r="38" fill="url(#lit)"/><text x="256" y="110" fill="#2a1800">A</text>
+    <circle cx="395" cy="176" r="34" fill="#2ed69b"/><text x="395" y="190" fill="#04261a">B</text>
+    <circle cx="395" cy="336" r="34" fill="url(#off)"/><text x="395" y="350" fill="#c9cdea">C</text>
+    <circle cx="256" cy="416" r="34" fill="#4fa8ff"/><text x="256" y="430" fill="#031a33">Ç</text>
+    <circle cx="117" cy="336" r="34" fill="url(#off)"/><text x="117" y="350" fill="#c9cdea">D</text>
+    <circle cx="117" cy="176" r="34" fill="#ff5b4f"/><text x="117" y="190" fill="#fff">E</text>
   </g>
+  <text x="256" y="300" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="128" fill="#ffd36b" stroke="#6b3d00" stroke-width="4">?</text>
 </svg>
