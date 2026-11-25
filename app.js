@@ -15,7 +15,7 @@ function profileKey() { return "profile." + (Auth.user ? Auth.user.uid : "none")
 function getProfile() {
   const u = Auth.user || { name: "Oyuncu" };
   const p = store.get(profileKey(), null) || {};
-  return { name: p.name || u.name || "Oyuncu", avatar: p.avatar || "🙂", games: p.games || 0, correct: p.correct || 0, answered: p.answered || 0, best: p.best || {}, photo: p.photo || "", sik: p.sik || { games: 0, correct: 0, answered: 0, best: {} } };
+  return { ...p, name: p.name || u.name || "Oyuncu", avatar: p.avatar || "🙂", games: p.games || 0, correct: p.correct || 0, answered: p.answered || 0, best: p.best || {}, photo: p.photo || "", sik: p.sik || { games: 0, correct: 0, answered: 0, best: {} } };
 }
 function saveProfile(p) { store.set(profileKey(), p); }
 
@@ -84,7 +84,7 @@ const Cloud = {
         const best = { ...(c.best || {}) };
         Object.entries(local.best).forEach(([k, v]) => { best[k] = Math.max(best[k] || 0, v); });
         merged = {
-          sik: local.sik,
+          ...local,
           photo: local.photo || (validPhoto(c.photo) ? c.photo : ""),
           name: c.name || local.name,
           avatar: c.avatar || local.avatar,
@@ -474,7 +474,7 @@ function pickChoice(i) {
   if (game.mode !== "choice" || game.over || game.paused || game.busy) return;
   const it = game.items[game.idx];
   const btns = [...$("choices").children];
-  if (!btns[i]) return;
+  if (!btns[i] || btns[i].classList.contains("gone")) return;
   btns.forEach((b, k) => {
     b.disabled = true;
     if (it.choices[k] === it.q.a) b.classList.add("right");
@@ -581,12 +581,13 @@ function startGame(cat, opts) {
   opts = opts || {};
   game.online = !!opts.online;
   game.cat = cat;
-  game.items = opts.items || buildQuestions(cat);
+  game.daily = cat.id === "gunluk" && !game.online;
+  game.items = opts.items || (game.daily ? buildDaily() : buildQuestions(cat));
   game.idx = 0;
   game.elapsed = 0;
-  game.total = opts.total !== undefined ? opts.total : parseInt($("opt-time").value, 10);
+  game.total = opts.total !== undefined ? opts.total : game.daily ? DAILY_TIME : parseInt($("opt-time").value, 10);
   const lvl = [...$("opt-time").options].find((o) => o.value === String(game.total)) || $("opt-time").selectedOptions[0];
-  game.level = game.online ? "👥 Online" : lvl.textContent.split("·")[0].trim();
+  game.level = game.online ? "👥 Online" : game.daily ? trDate(dayKey()) : lvl.textContent.split("·")[0].trim();
   $("btn-pause").classList.toggle("hidden", game.online);
   $("online-rank").classList.add("hidden");
   game.time = game.total;
@@ -597,6 +598,7 @@ function startGame(cat, opts) {
   document.querySelector(".panel").dataset.mode = game.mode;
   flash("", "");
   $("pause-overlay").classList.add("hidden");
+  if (typeof Extras !== "undefined") Extras.onStart();
   renderWheel();
   showScreen("game");
   updateTimer();
@@ -638,6 +640,7 @@ function showQuestion() {
   $("answer").value = "";
   $("heard").textContent = "";
   renderChoices(it);
+  if (typeof Extras !== "undefined") Extras.onQuestion(it);
   paintBubbles();
   const token = game.turn;
   if (game.mode === "keyboard") setTimeout(() => { if (token === game.turn) $("answer").focus({ preventScroll: true }); }, 50);
@@ -675,6 +678,7 @@ function pass() {
   stopListening();
   stopSpeaking();
   game.items[game.idx].status = "passed";
+  if (typeof Extras !== "undefined") Extras.onPass();
   beep("pas");
   flash("↻ Pas! Sonra tekrar gelecek.", "pas");
   advance(600);
@@ -735,7 +739,9 @@ function endGame(title) {
     // Online turda kişisel rekorlar değişmez; sıralama canlı gösterilir
     Online.report(true);
     $("res-best").textContent = "Sıralama aşağıda 👇";
-    $("btn-again").textContent = "ODAYA DÖN";
+    $("btn-again").textContent = Online.isHost() ? "🔁 RÖVANŞ" : "ODAYA DÖN";
+    $("btn-again").classList.remove("hidden");
+    if (typeof Extras !== "undefined") Extras.afterOnline({ c, w, e, n: game.items.length });
     $("btn-menu").textContent = "ODADAN ÇIK";
     $("btn-result-lb").classList.add("hidden");
     renderResultList();
@@ -744,6 +750,7 @@ function endGame(title) {
     return;
   }
   $("btn-again").textContent = "TEKRAR OYNA";
+  $("btn-again").classList.toggle("hidden", !!game.daily);
   $("btn-menu").textContent = "MENÜ";
   $("btn-result-lb").classList.remove("hidden");
   const p = getProfile();
@@ -752,13 +759,16 @@ function endGame(title) {
   st.games += 1; st.correct += c; st.answered += game.items.length;
   const tag = sik ? " · Şıklı" : "";
   const best = st.best[game.cat.id] || 0;
-  if (c > best) {
+  if (game.daily) {
+    $("res-best").textContent = "📅 Günün çarkı: " + c + "/" + game.items.length + " · Sonucunu paylaş, arkadaşların da çözsün!";
+  } else if (c > best) {
     st.best[game.cat.id] = c;
     $("res-best").textContent = "🎉 Yeni rekor! (" + game.cat.name + " · " + game.level + tag + ")";
     $("res-best").classList.add("record");
     setTimeout(() => confetti(c === game.items.length ? 140 : 70), 400);
   }
   else $("res-best").textContent = "Rekorun: " + best + " doğru (" + game.cat.name + tag + ") · Seviye: " + game.level;
+  if (typeof Extras !== "undefined") Extras.afterSolo(p, { c, w, e, n: game.items.length });
   saveProfile(p);
   if (!sik) Cloud.push(p);
 
@@ -819,6 +829,7 @@ function renderMenu() {
   const p = getProfile();
   paintAvatar($("chip-avatar"), p);
   $("chip-name").textContent = p.name;
+  if (typeof paintMenuExtras === "function") paintMenuExtras();
   const grid = $("category-grid");
   grid.innerHTML = "";
   [...CATEGORIES, MIXED].forEach((cat, i) => {
@@ -997,6 +1008,7 @@ function openProfile() {
     };
     $("avatar-grid").appendChild(b);
   });
+  if (typeof renderBadgeGrid === "function") renderBadgeGrid(p);
   $("st-games").textContent = p.games;
   $("st-correct").textContent = p.correct;
   $("st-rate").textContent = "%" + (p.answered ? Math.round((p.correct / p.answered) * 100) : 0);
@@ -1053,10 +1065,10 @@ function afterLogin() {
 }
 
 /* ---------- Liderlik tablosu ---------- */
-let lbTab = "toplam";
+let lbTab = "hafta";
 let lbToken = 0;
 function lbTabs() {
-  return [{ id: "toplam", name: "⭐ Toplam doğru" }, ...CATEGORIES.map((c) => ({ id: c.id, name: c.icon + " " + c.name })), { id: MIXED.id, name: MIXED.icon + " " + MIXED.name }];
+  return [{ id: "hafta", name: "📅 Bu hafta" }, { id: "toplam", name: "⭐ Tüm zamanlar" }, ...CATEGORIES.map((c) => ({ id: c.id, name: c.icon + " " + c.name })), { id: MIXED.id, name: MIXED.icon + " " + MIXED.name }];
 }
 function openLeaderboard(tab) {
   if (tab) lbTab = tab;
@@ -1076,7 +1088,9 @@ function openLeaderboard(tab) {
 async function loadLeaderboard() {
   const list = $("lb-list");
   const myToken = ++lbToken;
-  $("lb-caption").textContent = lbTab === "toplam" ? "Bütün oyunlarda bilinen toplam doğru sayısı" : "Bu kategoride tek oyunda en çok doğru (28 üzerinden)";
+  const weekly = lbTab === "hafta";
+  $("lb-caption").textContent = weekly ? "Bu hafta bilinen toplam doğru · Pazartesi sıfırlanır (" + daysLeftInWeek() + " gün kaldı)"
+    : lbTab === "toplam" ? "Bütün oyunlarda bilinen toplam doğru sayısı" : "Bu kategoride tek oyunda en çok doğru (28 üzerinden)";
   const guest = !Auth.user || Auth.user.provider === "local";
   $("lb-note").textContent = guest ? "Misafirler tabloda görünmez. Tabloya girmek için profilinden çıkıp e-posta ile hesap aç." : "";
   if (!Auth.db) {
@@ -1086,13 +1100,15 @@ async function loadLeaderboard() {
   list.innerHTML = '<li class="empty">Yükleniyor…</li>';
   const field = lbTab === "toplam" ? "correct" : "best." + lbTab;
   try {
-    const snap = await Auth.db.collection("users").orderBy(field, "desc").limit(20).get();
+    const snap = weekly
+      ? await Auth.db.collection("weekly").doc(weekKey()).collection("scores").orderBy("score", "desc").limit(20).get()
+      : await Auth.db.collection("users").orderBy(field, "desc").limit(20).get();
     if (myToken !== lbToken) return;
     const myId = Auth.user && Auth.user.uid;
     const rows = [];
     snap.forEach((doc) => {
       const d = doc.data();
-      const score = lbTab === "toplam" ? d.correct : (d.best || {})[lbTab];
+      const score = weekly ? d.score : lbTab === "toplam" ? d.correct : (d.best || {})[lbTab];
       if (!score) return;
       rows.push({ id: doc.id, name: d.name, avatar: d.avatar, photo: d.photo, score, games: d.games });
     });
@@ -1113,7 +1129,7 @@ async function loadLeaderboard() {
     });
     if (myId && !guest && !rows.some((r) => r.id === myId)) {
       const p = getProfile();
-      const mine = lbTab === "toplam" ? p.correct : (p.best[lbTab] || 0);
+      const mine = weekly ? (p.wk && p.wk.id === weekKey() ? p.wk.score : 0) : lbTab === "toplam" ? p.correct : (p.best[lbTab] || 0);
       $("lb-note").textContent = "İlk 20'de değilsin. Senin skorun: " + mine;
     }
   } catch (e) {
@@ -1173,11 +1189,19 @@ $("btn-quit").addEventListener("click", () => {
     Online.backToLobby();
     return;
   }
+  if (game.daily && !game.over) {
+    if (!confirm("Günün çarkı burada bitirilsin mi? Bugün tekrar oynayamazsın.")) return;
+    endGame("Günün çarkı bitti");
+    return;
+  }
   if (!game.over && !confirm("Oyundan çıkılsın mı?")) return;
   game.over = true; clearInterval(game.timerId); stopListening(); stopSpeaking();
   showScreen("menu");
 });
-$("btn-again").addEventListener("click", () => game.online && Online.active() ? Online.backToLobby() : askMode(game.cat));
+$("btn-again").addEventListener("click", () => {
+  if (game.online && Online.active()) return Online.isHost() ? Online.rematch() : Online.backToLobby();
+  askMode(game.cat);
+});
 $("btn-menu").addEventListener("click", async () => {
   if (game.online && Online.active()) { await Online.leave(); game.online = false; }
   renderMenu();

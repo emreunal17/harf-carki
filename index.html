@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@400;500;600;700;800&display=swap" />
-  <link rel="stylesheet" href="style.css?v=18" />
+  <link rel="stylesheet" href="style.css?v=19" />
 </head>
 <body>
   <!-- GİRİŞ / HESAP AÇ -->
@@ -80,6 +80,9 @@
     <h3 class="section-title">Ya da avatar seç</h3>
     <div id="avatar-grid" class="avatar-grid"></div>
 
+    <h3 class="section-title">Rozetler · <span id="badge-count">0</span></h3>
+    <div id="badge-grid" class="badge-grid"></div>
+
     <h3 class="section-title">İstatistikler</h3>
     <div class="stat-grid">
       <div class="stat"><b id="st-games">0</b><span>Oyun</span></div>
@@ -120,6 +123,11 @@
     </header>
 
     <div class="menu-actions">
+      <button id="btn-daily" class="lb-btn daily-btn" type="button">
+        <span class="db-main">📅 Günün Çarkı</span>
+        <span id="streak-pill" class="streak-pill hidden">🔥 0</span>
+        <span id="daily-state" class="db-state">Bugün oyna ▶</span>
+      </button>
       <button id="btn-online" class="lb-btn online-btn" type="button">👥 Arkadaşlarla Oyna</button>
       <button id="btn-leaderboard" class="lb-btn" type="button">🏆 Liderlik</button>
     </div>
@@ -196,8 +204,10 @@
       <button id="btn-quit" class="icon-btn" aria-label="Menüye dön">✕</button>
       <div id="game-category" class="topbar-title"></div>
       <button id="btn-pause" class="icon-btn" aria-label="Duraklat">❚❚</button>
+      <button id="btn-react" class="icon-btn hidden" aria-label="Tepki gönder">😀</button>
     </div>
     <div id="live-board" class="live-board hidden" aria-label="Canlı skorlar"></div>
+    <div id="react-bar" class="react-bar hidden" role="group" aria-label="Tepkiler"></div>
 
     <div class="game-layout">
       <div class="wheel-wrap">
@@ -221,7 +231,12 @@
       </div>
 
       <div class="panel">
+        <div class="jokers" role="group" aria-label="Jokerler">
+          <button id="jk-half" class="jk" type="button" title="Yarı yarıya: bir yanlış şıkkı siler" aria-label="Yarı yarıya jokeri">½</button>
+          <button id="jk-hint" class="jk" type="button" title="Harf aç: cevabın ilk iki harfini gösterir" aria-label="Harf aç jokeri">💡</button>
+        </div>
         <p id="question" class="question"></p>
+        <div id="hint" class="hint" aria-live="polite"></div>
         <div id="choices" class="choices" role="group" aria-label="Şıklar"></div>
         <div id="feedback" class="feedback" aria-live="polite"></div>
 
@@ -261,14 +276,17 @@
         <div class="big pass"><b id="res-empty">0</b><span>Boş</span></div>
       </div>
       <p id="res-best" class="res-best"></p>
+      <div id="new-badges" class="new-badges hidden"></div>
       <div id="online-rank" class="online-rank hidden">
         <ol id="online-rank-list" class="lb-list"></ol>
         <p id="online-rank-note" class="lb-note"></p>
+        <div id="react-row" class="react-row" role="group" aria-label="Tepki gönder"></div>
       </div>
       <div class="actions">
         <button id="btn-menu" class="btn btn-pass">MENÜ</button>
         <button id="btn-again" class="btn btn-ok">TEKRAR OYNA</button>
       </div>
+      <button id="btn-share" class="btn btn-share wide hidden" type="button">📤 SONUCU PAYLAŞ</button>
       <button id="btn-result-lb" class="link-btn">🏆 Liderlik tablosunu gör</button>
     </div>
     <h3 class="section-title">Cevaplar</h3>
@@ -342,6 +360,21 @@
     </div>
   </div>
 
+  <div id="daily-done" class="overlay hidden" role="dialog" aria-labelledby="dd-title">
+    <div class="overlay-card daily-card">
+      <h2 id="dd-title">📅 Günün Çarkı</h2>
+      <p id="dd-date" class="dd-date"></p>
+      <pre id="dd-grid" class="dd-grid"></pre>
+      <p id="dd-score" class="dd-score"></p>
+      <p id="dd-next" class="dd-next"></p>
+      <button id="btn-dd-share" class="btn btn-ok wide" type="button">📤 SONUCU PAYLAŞ</button>
+      <button id="btn-dd-close" class="link-btn" type="button">Kapat</button>
+    </div>
+  </div>
+
+  <div id="react-layer" class="react-layer" aria-hidden="true"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
   <div id="howto" class="overlay hidden">
     <div class="overlay-card howto">
       <h2>Nasıl oynanır?</h2>
@@ -356,13 +389,14 @@
     </div>
   </div>
 
-  <script src="speech-text.js?v=18"></script>
-  <script src="questions.js?v=18"></script>
-  <script src="questions-extra.js?v=18"></script>
-  <script src="questions-choices.js?v=18"></script>
-  <script src="firebase-config.js?v=18"></script>
-  <script src="auth.js?v=18"></script>
-  <script src="online.js?v=18"></script>
-  <script src="app.js?v=18"></script>
+  <script src="speech-text.js?v=19"></script>
+  <script src="questions.js?v=19"></script>
+  <script src="questions-extra.js?v=19"></script>
+  <script src="questions-choices.js?v=19"></script>
+  <script src="firebase-config.js?v=19"></script>
+  <script src="auth.js?v=19"></script>
+  <script src="online.js?v=19"></script>
+  <script src="app.js?v=19"></script>
+  <script src="extras.js?v=19"></script>
 </body>
 </html>

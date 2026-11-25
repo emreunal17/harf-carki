@@ -107,6 +107,7 @@ const Online = (() => {
     }, (e) => console.warn("Oda dinlenemedi:", e));
     unsubPlayers = roomRef().collection("players").onSnapshot((s) => {
       players = s.docs.map((d) => ({ id: d.id, ...d.data() }));
+      handleReacts();
       renderLobby();
       renderLive();
       renderRanking();
@@ -117,7 +118,7 @@ const Online = (() => {
     if (unsubRoom) unsubRoom(); if (unsubPlayers) unsubPlayers();
     unsubRoom = unsubPlayers = null;
     clearTimeout(reportTimer);
-    code = null; room = null; players = []; localRound = 0;
+    code = null; room = null; players = []; localRound = 0; seenReacts = {};
     store.set("online-room", null);
     $("live-board").classList.add("hidden");
     $("online-rank").classList.add("hidden");
@@ -173,6 +174,31 @@ const Online = (() => {
       }).catch((e) => console.warn("Skor gönderilemedi:", e));
     };
     if (done) send(); else reportTimer = setTimeout(send, 250);
+  }
+
+  // Rövanş: kurucu aynı ayarlarla hemen yeni tur başlatır
+  async function rematch() {
+    if (!isHost()) return backToLobby();
+    const r = room ? room.round : 0;
+    const waiting = players.filter((p) => p.round === r && !p.done && p.id !== Auth.user.uid).length;
+    if (waiting && !confirm(waiting + " oyuncu hâlâ oynuyor. Yine de yeni tur başlasın mı?")) return;
+    await start();
+  }
+
+  // Emoji tepkileri: oyuncu kaydındaki react alanı değişince ekranda uçur
+  let seenReacts = {};
+  function handleReacts() {
+    players.forEach((p) => {
+      if (!p.react || typeof p.react.n !== "number") return;
+      const prev = seenReacts[p.id];
+      seenReacts[p.id] = p.react.n;
+      if (prev === undefined || prev === p.react.n || p.id === Auth.user.uid) return;
+      if (typeof floatEmoji === "function") floatEmoji(p.react.e, p.name);
+    });
+  }
+  function react(e) {
+    if (!code) return;
+    meRef().update({ react: { e, n: Date.now() % 2000000000 } }).catch((err) => console.warn("Tepki gönderilemedi:", err));
   }
 
   async function backToLobby() {
@@ -265,7 +291,11 @@ const Online = (() => {
     const waiting = rows.filter((p) => !p.done).length;
     $("online-rank-note").textContent = waiting ? waiting + " oyuncu hâlâ oynuyor, sıralama canlı güncelleniyor." : "Herkes bitirdi!";
     const first = rows[0];
-    if (!waiting && first) $("result-title").textContent = first.id === Auth.user.uid ? "🏆 Kazandın!" : "🏆 Kazanan: " + first.name;
+    if (!waiting && first) {
+      $("result-title").textContent = first.id === Auth.user.uid ? "🏆 Kazandın!" : "🏆 Kazanan: " + first.name;
+      if (first.id === Auth.user.uid && rows.length > 1 && typeof Extras !== "undefined") Extras.onlineWon();
+    }
+    if (!waiting && !isHost()) $("online-rank-note").textContent = "Herkes bitirdi! Kurucu rövanş başlatabilir.";
   }
 
   async function share() {
@@ -277,5 +307,5 @@ const Online = (() => {
   }
   function flashLobby(msg) { const m = $("lobby-hint"); m.textContent = msg; }
 
-  return { create, join, leave, start, report, backToLobby, share, renderRanking, renderLive, canPlay, active, isHost, get code() { return code; } };
+  return { create, join, leave, start, rematch, react, report, backToLobby, share, renderRanking, renderLive, canPlay, active, isHost, get code() { return code; } };
 })();
