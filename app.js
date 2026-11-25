@@ -1194,6 +1194,21 @@ $("btn-time-chip").addEventListener("click", openSettings);
 $("btn-settings-close").addEventListener("click", () => $("settings-overlay").classList.add("hidden"));
 $("settings-overlay").addEventListener("click", (e) => { if (e.target.id === "settings-overlay") $("settings-overlay").classList.add("hidden"); });
 $("opt-time").addEventListener("change", paintTimeChip);
+const THEME_BG = { sahne: "#0a0c18", kagit: "#f5f2eb", sakin: "#f8f9fa", gece: "#121213" };
+function applyTheme(t) {
+  if (!THEME_BG[t]) t = "sahne";
+  if (t === "sahne") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
+  document.querySelector('meta[name="theme-color"]').setAttribute("content", THEME_BG[t]);
+  document.querySelectorAll("#theme-pick button").forEach((b) => {
+    const on = b.dataset.theme === t;
+    b.classList.toggle("sel", on); b.setAttribute("aria-checked", on);
+  });
+}
+document.querySelectorAll("#theme-pick button").forEach((b) => {
+  b.setAttribute("role", "radio");
+  b.addEventListener("click", () => { store.set("theme", b.dataset.theme); applyTheme(b.dataset.theme); });
+});
+applyTheme(store.get("theme", "sahne"));
 paintTimeChip();
 $("btn-howto-close").addEventListener("click", () => $("howto").classList.add("hidden"));
 document.addEventListener("visibilitychange", () => { if (document.hidden && !game.over && !game.paused && !game.online) setPaused(true); });

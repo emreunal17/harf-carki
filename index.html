@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
   <meta name="theme-color" content="#0a0c18" />
+  <script>try{var t=JSON.parse(localStorage.getItem("harfcarki.theme"));if(t&&t!=="sahne")document.documentElement.dataset.theme=t;}catch(e){}</script>
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Harf Çarkı" />
@@ -301,6 +302,13 @@
     <div class="overlay-card settings-card">
       <h2 id="settings-title">⚙️ Ayarlar</h2>
       <div class="settings">
+        <div class="setting-label">Tema</div>
+        <div id="theme-pick" class="theme-pick" role="radiogroup" aria-label="Tema">
+          <button type="button" data-theme="sahne"><i style="background:linear-gradient(135deg,#151933 50%,#ffb22e 50%)"></i>Sahne</button>
+          <button type="button" data-theme="kagit"><i style="background:linear-gradient(135deg,#f5f2eb 50%,#6aaa64 50%)"></i>Kağıt</button>
+          <button type="button" data-theme="sakin"><i style="background:linear-gradient(135deg,#ffffff 50%,#3b82f6 50%)"></i>Sakin</button>
+          <button type="button" data-theme="gece"><i style="background:linear-gradient(135deg,#121213 50%,#c9b458 50%)"></i>Gece</button>
+        </div>
         <label class="setting">
           <span>Süre</span>
           <select id="opt-time">
