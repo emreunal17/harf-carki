@@ -59,13 +59,13 @@ Soruları cihazın kendi Türkçe sesi okur. Menüdeki **Okuyan ses** listesinde
 - **Android:** Ayarlar → Metin okuma → Google Konuşma Hizmetleri → Türkçe ses verisini yükleyin.
 - **Windows:** Edge tarayıcısında "Emel/Ahmet Online (Natural)" sesleri çok daha doğaldır.
 
-### Doğal stüdyo sesi (ElevenLabs)
-Sorular ElevenLabs ile önceden seslendirilip `audio/` klasörüne konabilir. Dosyalar varsa menüde **🎙 Oğuz · stüdyo sesi** seçeneği çıkar ve varsayılan olur; dosyası olmayan sorular cihaz sesiyle okunur.
+### Doğal stüdyo sesi
+Sorular önceden seslendirilip `audio/` klasöründe durur (şu an: Microsoft'un ücretsiz Türkçe **Ahmet** sesi). Menüde **🎙 Ahmet · stüdyo sesi** seçeneği varsayılandır; dosyası olmayan sorular cihaz sesiyle okunur.
 
+Soru ekleyip değiştirdikten sonra yeni/değişen soruları seslendirmek için:
 ```powershell
-$env:ELEVENLABS_API_KEY = "anahtarınız"   # elevenlabs.io → Developers → API Keys (Text to Speech izni yeterli)
-node tools/seslendir.mjs --dry            # kaç ses üretileceğini gösterir, kredi harcamaz
-node tools/seslendir.mjs --limit 3        # önce 3 tane dene
-node tools/seslendir.mjs                  # hepsini üret (672 soru ≈ 31.000 kredi)
+python -m pip install --user edge-tts      # bir kez
+node tools/seslendir.mjs                    # yalnızca eksikleri üretir, ücretsiz
 ```
-Soru ekleyip değiştirdikten sonra komutu tekrar çalıştırın: yalnızca yeni/değişen sorular seslendirilir. Başka bir ses için `--voice <voice_id>`, ad için `--voice-name "Öykü"` ekleyin.
+Kadın ses için: `node tools/seslendir.mjs --voice tr-TR-EmelNeural --voice-name Emel`
+ElevenLabs ile (Creator ya da üstü paket gerekir; anahtarı betik sorar): `node tools/seslendir.mjs --engine elevenlabs --voice <voice_id> --voice-name <ad>`
