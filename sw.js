@@ -1,9 +1,9 @@
 // Çevrimdışı çalışma için basit önbellek. Dosyaları güncellediğinizde VERSION'ı artırın.
-const VERSION = "harfcarki-v17";
+const VERSION = "harfcarki-v18";
 const FILES = ["./", "./index.html", "./style.css", "./app.js", "./questions.js", "./speech-text.js", "./questions-extra.js", "./questions-choices.js", "./online.js", "./auth.js", "./firebase-config.js", "./manifest.json", "./icon.svg"];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(FILES.map((f) => new Request(f, { cache: "reload" })))).then(() => self.skipWaiting()));
 });
 self.addEventListener("activate", (e) => {
   e.waitUntil(
@@ -15,8 +15,9 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
   e.respondWith(
-    fetch(e.request)
+    // Aynı sitedeki dosyalarda tarayıcı önbelleğini atla: her açılışta sunucuya "değişti mi?" diye sorulur
+    fetch(e.request, new URL(e.request.url).origin === location.origin ? { cache: "no-cache" } : undefined)
       .then((res) => { const copy = res.clone(); caches.open(VERSION).then((c) => c.put(e.request, copy)); return res; })
-      .catch(() => caches.match(e.request))
+      .catch(() => caches.match(e.request, { ignoreSearch: true }))
   );
 });

@@ -1280,5 +1280,16 @@ initSettings();
 Auth.init().then(afterLogin);
 
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
-  navigator.serviceWorker.register("sw.js").catch(() => {});
+  // Yeni sürüm yayınlanınca: arka planda kontrol et, hazır olunca sayfayı bir kez yenile
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadController || reloaded) return;
+    if (typeof game !== "undefined" && game && !game.over && $("screen-game").classList.contains("active")) return; // oyun sırasında bölme
+    reloaded = true; location.reload();
+  });
+  navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then((reg) => {
+    reg.update().catch(() => {});
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") reg.update().catch(() => {}); });
+  }).catch(() => {});
 }
