@@ -1077,3 +1077,15 @@ html[data-theme="kagit"] .setting select option, html[data-theme="sakin"] .setti
   #screen-menu .brand { margin-bottom: 8px; }
   .menu-actions { gap: 6px; }
 }
+
+/* joker sayıları */
+.jk { position: relative; }
+.jk::after {
+  content: attr(data-n); position: absolute; top: -7px; right: -7px; min-width: 17px; height: 17px; padding: 0 4px;
+  border-radius: 9px; display: grid; place-items: center; font: 800 10px/1 var(--body);
+  background: var(--red); color: #fff; box-shadow: 0 0 0 2px var(--panel);
+}
+.jk.empty:not(:disabled) { background: var(--panel-2); color: var(--muted); box-shadow: none; border: 1px solid var(--line); }
+.jk.empty::after { background: var(--muted); }
+.joker-bag { text-align: center; font-weight: 700; margin: 12px 0 0; color: var(--accent-text); }
+.nb.reward { background: color-mix(in srgb, var(--green) 12%, var(--panel)); border-color: color-mix(in srgb, var(--green) 50%, transparent); }

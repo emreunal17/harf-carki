@@ -130,6 +130,7 @@ $("btn-dd-share").addEventListener("click", () => {
 function bumpStreak(p) {
   const t = dayKey();
   const s = p.streak || { last: "", count: 0, best: 0 };
+  p.streakNewDay = s.last !== t;
   if (s.last !== t) {
     s.count = s.last === dayShift(t, -1) ? s.count + 1 : 1;
     s.last = t;
@@ -146,6 +147,7 @@ function currentStreak(p) {
 }
 
 function paintMenuExtras() {
+  ensureGift();
   const p = getProfile();
   const st = currentStreak(p);
   const pill = $("streak-pill");
@@ -237,6 +239,8 @@ function renderBadgeGrid(p) {
     el.onclick = () => toast(b.icon + " " + b.name + " — " + b.desc + (got[b.id] ? " ✔ (" + trDate(got[b.id]) + ")" : ""), 3200);
     grid.appendChild(el);
   });
+  const bag = jokerBag(p);
+  $("joker-bag").textContent = "Jokerlerin: ½ × " + bag.half + " · 💡 × " + bag.hint;
   $("badge-count").textContent = Object.keys(got).filter(badgeById).length + "/" + BADGES.length;
 }
 
@@ -261,17 +265,74 @@ const Weekly = {
 };
 
 /* ================= JOKERLER ================= */
+// Envanter profilde: p.jokers = { half, hint }. Yeni oyuncuya hoş geldin hediyesi verilir.
+// Bir oyunda her türden en fazla 1 joker kullanılır; envanterden düşer.
+const JOKER_GIFT = { half: 3, hint: 3 };
+const JOKER_MAX = 99;
+const jokerBag = (p) => ({ half: 0, hint: 0, ...(p.jokers || {}) });
+function giveJokers(p, half, hint) {
+  const b = jokerBag(p);
+  b.half = Math.min(JOKER_MAX, b.half + half);
+  b.hint = Math.min(JOKER_MAX, b.hint + hint);
+  p.jokers = b;
+}
+function ensureGift() {
+  const p = getProfile();
+  if (p.jokerGift) return;
+  giveJokers(p, JOKER_GIFT.half, JOKER_GIFT.hint);
+  p.jokerGift = dayKey();
+  saveProfile(p);
+  setTimeout(() => toast("🎁 Hoş geldin hediyesi: " + JOKER_GIFT.half + " × ½ ve " + JOKER_GIFT.hint + " × 💡 joker!", 4000), 700);
+}
+function spendJoker(k) {
+  const p = getProfile();
+  const bag = jokerBag(p);
+  if (!(bag[k] > 0)) {
+    toast("Bu jokerin kalmadı. Günün çarkını bitirerek, seri yaparak ve rozet kazanarak yeni joker kazanırsın 🎁", 4000);
+    return false;
+  }
+  bag[k]--;
+  p.jokers = bag;
+  saveProfile(p);
+  return true;
+}
 function resetJokers() {
-  game.jokers = { half: 1, hint: 1 };
+  game.jokers = { half: 1, hint: 1 }; // bu oyunda kullanılabilecek
   game.jokerUsed = false;
   game.passed = false;
   paintJokers();
 }
 function paintJokers() {
   const j = game.jokers || { half: 0, hint: 0 };
+  const bag = jokerBag(getProfile());
+  [["half", "jk-half"], ["hint", "jk-hint"]].forEach(([k, id]) => {
+    const b = $(id);
+    b.dataset.n = bag[k];
+    b.disabled = !j[k];
+    b.classList.toggle("empty", !(bag[k] > 0));
+  });
   $("jk-half").classList.toggle("hidden", game.mode !== "choice");
-  $("jk-half").disabled = !j.half;
-  $("jk-hint").disabled = !j.hint;
+}
+// Oyun sonu ödülleri: günün çarkı, 7 günlük seri, yeni rozet
+function jokerRewards(p, opts) {
+  let half = 0, hint = 0;
+  if (opts.daily) { half += 1; hint += 1; }
+  if (opts.newDay && opts.streak > 0 && opts.streak % 7 === 0) { half += 3; hint += 3; }
+  hint += opts.badges || 0;
+  if (half || hint) giveJokers(p, half, hint);
+  return { half, hint };
+}
+function showReward(r, p) {
+  if (!r.half && !r.hint) return;
+  const box = $("new-badges");
+  box.classList.remove("hidden");
+  const el = document.createElement("div");
+  el.className = "nb reward";
+  el.style.setProperty("--i", box.children.length);
+  el.innerHTML = '<span class="nb-ico">🎁</span><span><b></b><small></small></span>';
+  el.querySelector("b").textContent = "Joker kazandın: " + [r.half ? "+" + r.half + " × ½" : "", r.hint ? "+" + r.hint + " × 💡" : ""].filter(Boolean).join("  ");
+  el.querySelector("small").textContent = "Jokerlerin: ½ × " + jokerBag(p).half + " · 💡 × " + jokerBag(p).hint;
+  box.appendChild(el);
 }
 function hintText(a) {
   let shown = 0;
@@ -287,6 +348,7 @@ function paintHint(it) {
 }
 function useHint() {
   if (game.over || game.paused || game.busy || !game.jokers || !game.jokers.hint) return;
+  if (!spendJoker("hint")) return;
   const it = game.items[game.idx];
   it.hinted = true;
   game.jokers.hint = 0; game.jokerUsed = true;
@@ -296,6 +358,7 @@ function useHalf() {
   if (game.mode !== "choice" || game.over || game.paused || game.busy || !game.jokers || !game.jokers.half) return;
   const it = game.items[game.idx];
   if (!it.choices) return;
+  if (!spendJoker("half")) return;
   const wrong = it.choices.map((c, i) => i).filter((i) => it.choices[i] !== it.q.a);
   it.halfGone = wrong[Math.floor(Math.random() * wrong.length)];
   game.jokers.half = 0; game.jokerUsed = true;
@@ -368,24 +431,30 @@ const Extras = {
   // Tek kişilik oyun bitti: p kaydedilmeden önce çağrılır
   afterSolo(p, g) {
     if (game.daily) p.daily = { date: dayKey(), res: resString(game.items), mode: game.mode };
-    bumpStreak(p);
+    const streak = bumpStreak(p);
+    const newDay = p.streakNewDay; delete p.streakNewDay;
     Weekly.add(p, g.c);
     const fresh = checkBadges(p, { ...g, daily: game.daily, passed: game.passed, jokerUsed: game.jokerUsed, total: game.total, timeLeft: game.time });
     showNewBadges(fresh);
+    const r = jokerRewards(p, { daily: game.daily, newDay, streak, badges: fresh.length });
+    showReward(r, p);
     $("btn-share").classList.remove("hidden");
   },
   afterOnline(g) {
     const p = getProfile();
-    bumpStreak(p);
+    const streak = bumpStreak(p);
+    const newDay = p.streakNewDay; delete p.streakNewDay;
     const fresh = checkBadges(p, { ...g, online: true, passed: game.passed, jokerUsed: game.jokerUsed, total: game.total, timeLeft: game.time });
+    const r = jokerRewards(p, { newDay, streak, badges: fresh.length });
     saveProfile(p);
     showNewBadges(fresh);
+    showReward(r, p);
     $("btn-share").classList.add("hidden");
   },
   onlineWon() {
     const p = getProfile();
     const fresh = award(p, ["sampiyon"]);
-    if (fresh.length) { saveProfile(p); toast("🏅 Yeni rozet: 👑 Oda Şampiyonu"); }
+    if (fresh.length) { giveJokers(p, 0, 1); saveProfile(p); toast("🏅 Yeni rozet: 👑 Oda Şampiyonu · +1 💡 joker"); }
   },
   share() {
     const p = getProfile();
