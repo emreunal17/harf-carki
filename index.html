@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@400;500;600;700;800&display=swap" />
-  <link rel="stylesheet" href="style.css?v=19" />
+  <link rel="stylesheet" href="style.css?v=20" />
 </head>
 <body>
   <!-- GİRİŞ / HESAP AÇ -->
@@ -158,12 +158,6 @@
         <h3>🎪 Oda kur</h3>
         <label class="setting"><span>Kategori</span><select id="on-cat"></select></label>
         <label class="setting"><span>Süre</span><select id="on-time"></select></label>
-        <div class="setting"><span>Cevaplama</span>
-          <div id="on-mode" class="seg">
-            <button type="button" data-mode="choice" class="sel">🔤 Şıklı</button>
-            <button type="button" data-mode="free">⌨️ Yazarak</button>
-          </div>
-        </div>
         <button id="btn-create-room" class="btn btn-ok wide" type="button">ODA KUR</button>
       </div>
 
@@ -306,10 +300,6 @@
         <span class="mode-ico">🎤</span>
         <span><b>Sesle</b><small>Soru bitince mikrofon kendiliğinden açılır, cevabını söylersin. “Pas” demen yeterli.</small></span>
       </button>
-      <button id="mode-keyboard" class="mode-btn" type="button">
-        <span class="mode-ico">⌨️</span>
-        <span><b>Klavyeyle</b><small>Cevabını yazıp CEVAPLA'ya basarsın.</small></span>
-      </button>
       <p id="mode-msg" class="mode-msg"></p>
       <button id="mode-cancel" class="link-btn" type="button">Vazgeç</button>
     </div>
@@ -380,7 +370,7 @@
       <h2>Nasıl oynanır?</h2>
       <ul>
         <li>Çarkta Türk alfabesinin her harfi için bir soru var. Önce soru okunur, sonra harf söylenir: cevap o harfle <b>başlar</b> ya da “içinde … var” denirse o harfi <b>içerir</b>.</li>
-        <li>Oyuna girerken <b>Şıklı</b>, <b>Sesle</b> ya da <b>Klavyeyle</b> oynamayı seçersin. Şıklıda 3 şıktan doğrusuna dokunursun; şıklı rekorlar ayrı tutulur ve liderlik tablosuna girmez. Sesle oynarken soru bitince mikrofon kendiliğinden açılır; cevabını söylemen yeterli.</li>
+        <li>Oyuna girerken <b>Şıklı</b> ya da <b>Sesle</b> oynamayı seçersin. Şıklıda 3 şıktan doğrusuna dokunursun; şıklı rekorlar ayrı tutulur ve liderlik tablosuna girmez. Sesle oynarken soru bitince mikrofon kendiliğinden açılır; cevabını söylemen yeterli.</li>
         <li>Bilmiyorsan <b>PAS</b> de: o harf mavi olur, tur sonunda tekrar sana gelir. Sesli oynarken “pas” demen yeterli.</li>
         <li>Süre bitmeden bütün harfleri tamamlamaya çalış. Yeşil = doğru, kırmızı = yanlış, mavi = pas.</li>
         <li>Küçük yazım hataları ve Türkçe karakter eksikleri (ş→s, ı→i…) tolere edilir.</li>
@@ -389,14 +379,14 @@
     </div>
   </div>
 
-  <script src="speech-text.js?v=19"></script>
-  <script src="questions.js?v=19"></script>
-  <script src="questions-extra.js?v=19"></script>
-  <script src="questions-choices.js?v=19"></script>
-  <script src="firebase-config.js?v=19"></script>
-  <script src="auth.js?v=19"></script>
-  <script src="online.js?v=19"></script>
-  <script src="app.js?v=19"></script>
-  <script src="extras.js?v=19"></script>
+  <script src="speech-text.js?v=20"></script>
+  <script src="questions.js?v=20"></script>
+  <script src="questions-extra.js?v=20"></script>
+  <script src="questions-choices.js?v=20"></script>
+  <script src="firebase-config.js?v=20"></script>
+  <script src="auth.js?v=20"></script>
+  <script src="online.js?v=20"></script>
+  <script src="app.js?v=20"></script>
+  <script src="extras.js?v=20"></script>
 </body>
 </html>

@@ -382,7 +382,7 @@ function handleVoice(alts) {
 }
 
 /* ================= OYUN ================= */
-const game = { items: [], idx: 0, time: 0, total: 0, timerId: null, paused: false, over: true, cat: null, turn: 0, busy: false, level: "", mode: "keyboard" };
+const game = { items: [], idx: 0, time: 0, total: 0, timerId: null, paused: false, over: true, cat: null, turn: 0, busy: false, level: "", mode: "choice" };
 
 // Son oyunlarda sorulanları hatırla; her harfte önce görülmemiş sorulardan seç
 const SEEN_MAX = 1500;
@@ -857,8 +857,8 @@ function askMode(cat) {
   $("mode-msg").textContent = voiceSupported() ? "" : "Bu tarayıcıda sesle cevap verilemiyor. Android'de Chrome, iPhone/iPad'de Safari kullan.";
   $("mode-voice").disabled = !voiceSupported();
   let last = store.get("answer-mode", "choice");
-  if (last === "voice" && !voiceSupported()) last = "choice";
-  ["choice", "voice", "keyboard"].forEach((m) => $("mode-" + m).classList.toggle("last", m === last));
+  if (last !== "voice" || !voiceSupported()) last = "choice"; // klavye seçeneği kaldırıldı
+  ["choice", "voice"].forEach((m) => $("mode-" + m).classList.toggle("last", m === last));
   $("mode-pick").classList.remove("hidden");
   $("mode-" + last).focus({ preventScroll: true });
 }
@@ -872,7 +872,7 @@ async function chooseMode(mode) {
         const st = await navigator.mediaDevices.getUserMedia({ audio: true });
         st.getTracks().forEach((t) => t.stop());
       } catch (e) {
-        $("mode-msg").textContent = "Mikrofon izni verilmedi. Tarayıcı ayarlarından izin ver ya da Klavyeyle oyna.";
+        $("mode-msg").textContent = "Mikrofon izni verilmedi. Tarayıcı ayarlarından izin ver ya da Şıklı oyna.";
         return;
       }
     }
@@ -884,7 +884,6 @@ async function chooseMode(mode) {
 }
 $("mode-choice").addEventListener("click", () => chooseMode("choice"));
 $("mode-voice").addEventListener("click", () => chooseMode("voice"));
-$("mode-keyboard").addEventListener("click", () => chooseMode("keyboard"));
 $("mode-cancel").addEventListener("click", closeMode);
 $("mode-pick").addEventListener("click", (e) => { if (e.target === $("mode-pick")) closeMode(); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("mode-pick").classList.contains("hidden")) closeMode(); });
@@ -921,12 +920,8 @@ async function onlineRun(btn, fn) {
 $("btn-online").addEventListener("click", () => openOnline());
 $("btn-online-back").addEventListener("click", () => showScreen("menu"));
 $("btn-online-login").addEventListener("click", async () => { await Auth.logout(); afterLogin(); });
-document.querySelectorAll("#on-mode button").forEach((b) => b.addEventListener("click", () => {
-  document.querySelectorAll("#on-mode button").forEach((x) => x.classList.toggle("sel", x === b));
-}));
 $("btn-create-room").addEventListener("click", (e) => onlineRun(e.currentTarget, () => {
-  const mode = document.querySelector("#on-mode button.sel").dataset.mode;
-  return Online.create($("on-cat").value, parseInt($("on-time").value, 10), mode);
+  return Online.create($("on-cat").value, parseInt($("on-time").value, 10), "choice");
 }));
 $("join-form").addEventListener("submit", (e) => { e.preventDefault(); onlineRun($("btn-join-room"), () => Online.join($("on-code").value)); });
 $("on-code").addEventListener("input", (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5); });
