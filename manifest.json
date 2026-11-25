@@ -1,0 +1,15 @@
+{
+  "name": "Harf Çarkı — Kelime Yarışması",
+  "short_name": "Harf Çarkı",
+  "description": "Her harfe bir soru: yazarak ya da sesle cevapla.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#14123a",
+  "theme_color": "#14123a",
+  "lang": "tr",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

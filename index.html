@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#14123a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Harf Çarkı" />
+  <title>Harf Çarkı — Kelime Yarışması</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- GİRİŞ / HESAP AÇ -->
+  <section id="screen-login" class="screen active">
+    <header class="brand">
+      <div class="brand-logo" aria-hidden="true"><span>A</span><span>B</span><span>C</span></div>
+      <h1>Harf Çarkı</h1>
+      <p class="tagline">Giriş yap ya da hesap aç, rekorların seninle kalsın.</p>
+    </header>
+
+    <div class="auth-card">
+      <button id="btn-google" class="auth-btn google" type="button">
+        <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+        Google ile devam et
+      </button>
+      <button id="btn-facebook" class="auth-btn facebook" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M24 12a12 12 0 1 0-13.9 11.9v-8.4H7.1V12h3V9.4c0-3 1.8-4.7 4.5-4.7 1.3 0 2.7.2 2.7.2v3h-1.5c-1.5 0-2 .9-2 1.9V12h3.4l-.5 3.5h-2.9v8.4A12 12 0 0 0 24 12z"/></svg>
+        Facebook ile devam et
+      </button>
+
+      <div class="divider"><span>ya da e-posta ile</span></div>
+
+      <form id="email-form" class="email-form" autocomplete="on">
+        <input id="reg-name" type="text" placeholder="Adın (hesap açarken)" autocomplete="nickname" class="only-register hidden" />
+        <input id="email" type="email" placeholder="E-posta adresin" autocomplete="email" required />
+        <input id="password" type="password" placeholder="Şifre (en az 6 karakter)" autocomplete="current-password" minlength="6" required />
+        <button id="btn-email" class="btn btn-ok" type="submit">GİRİŞ YAP</button>
+        <div class="auth-links">
+          <button id="btn-toggle-register" type="button" class="link-btn small">Hesabın yok mu? <b>Hesap aç</b></button>
+          <button id="btn-forgot" type="button" class="link-btn small">Şifremi unuttum</button>
+        </div>
+      </form>
+      <p id="auth-msg" class="auth-msg" aria-live="polite"></p>
+      <p id="auth-setup-note" class="auth-note hidden">Hesap girişi henüz etkinleştirilmedi (Firebase kurulumu gerekiyor). Şimdilik bu cihazda yerel profil açarak oynayabilirsin.</p>
+    </div>
+
+    <div class="divider"><span>veya</span></div>
+    <button id="btn-guest" class="btn btn-pass wide" type="button">MİSAFİR OLARAK OYNA</button>
+  </section>
+
+  <!-- PROFİL -->
+  <section id="screen-profile" class="screen">
+    <div class="topbar">
+      <button id="btn-profile-back" class="icon-btn" aria-label="Geri">←</button>
+      <div class="topbar-title">Profilim</div>
+      <span style="width:42px"></span>
+    </div>
+
+    <div class="profile-head">
+      <div id="profile-avatar" class="profile-avatar">🙂</div>
+      <input id="profile-name" class="profile-name" type="text" maxlength="20" placeholder="Adın" />
+      <p id="profile-account" class="profile-account"></p>
+    </div>
+
+    <h3 class="section-title">Avatar seç</h3>
+    <div id="avatar-grid" class="avatar-grid"></div>
+
+    <h3 class="section-title">İstatistikler</h3>
+    <div class="stat-grid">
+      <div class="stat"><b id="st-games">0</b><span>Oyun</span></div>
+      <div class="stat"><b id="st-correct">0</b><span>Toplam doğru</span></div>
+      <div class="stat"><b id="st-rate">%0</b><span>Başarı</span></div>
+    </div>
+    <ul id="st-best" class="best-list"></ul>
+
+    <button id="btn-profile-save" class="btn btn-ok wide" type="button">KAYDET</button>
+    <button id="btn-logout" class="btn btn-danger wide" type="button">ÇIKIŞ YAP</button>
+  </section>
+
+  <!-- ANA MENÜ -->
+  <section id="screen-menu" class="screen">
+    <button id="btn-profile" class="profile-chip" aria-label="Profil">
+      <span id="chip-avatar" class="chip-avatar">🙂</span><span id="chip-name">Profil</span>
+    </button>
+    <header class="brand">
+      <div class="brand-logo" aria-hidden="true">
+        <span>A</span><span>B</span><span>C</span>
+      </div>
+      <h1>Harf Çarkı</h1>
+      <p class="tagline">Her harfe bir soru. Yaz ya da söyle!</p>
+    </header>
+
+    <h2 class="section-title">Kategori seç</h2>
+    <div id="category-grid" class="category-grid"></div>
+
+    <div class="settings">
+      <label class="setting">
+        <span>Süre</span>
+        <select id="opt-time">
+          <option value="300">🐣 Acemi · 5 dk</option>
+          <option value="240" selected>🌱 Başlangıç · 4 dk</option>
+          <option value="180">⚡ Orta · 3 dk</option>
+          <option value="120">🔥 Usta · 2 dk</option>
+          <option value="90">👑 Efsane · 90 sn</option>
+          <option value="0">☕ Rahat · Süresiz</option>
+        </select>
+      </label>
+      <label class="setting toggle">
+        <span>Soruları sesli oku</span>
+        <input type="checkbox" id="opt-tts" checked />
+        <i></i>
+      </label>
+      <div class="setting voice-row" id="voice-row">
+        <span>Okuyan ses</span>
+        <div class="voice-ctl">
+          <select id="opt-voice"></select>
+          <button id="btn-voice-test" type="button" class="chip-btn">▶ Dinle</button>
+        </div>
+      </div>
+      <label class="setting">
+        <span>Okuma hızı <small id="rate-label">Normal</small></span>
+        <input type="range" id="opt-rate" min="0.75" max="1.25" step="0.05" value="0.95" />
+      </label>
+      <p id="voice-tip" class="voice-tip"></p>
+      <label class="setting toggle">
+        <span>Eller serbest <small>(okuduktan sonra mikrofonu kendisi açar)</small></span>
+        <input type="checkbox" id="opt-handsfree" />
+        <i></i>
+      </label>
+    </div>
+
+    <button id="btn-howto" class="link-btn">Nasıl oynanır?</button>
+    <p id="voice-warning" class="voice-warning hidden"></p>
+  </section>
+
+  <!-- OYUN -->
+  <section id="screen-game" class="screen">
+    <div class="topbar">
+      <button id="btn-quit" class="icon-btn" aria-label="Menüye dön">✕</button>
+      <div id="game-category" class="topbar-title"></div>
+      <button id="btn-pause" class="icon-btn" aria-label="Duraklat">❚❚</button>
+    </div>
+
+    <div class="game-layout">
+      <div class="wheel-wrap">
+        <div id="wheel" class="wheel">
+          <div class="wheel-center">
+            <div id="current-letter" class="current-letter">A</div>
+            <div id="letter-rule" class="letter-rule">baş harfi</div>
+            <div id="timer" class="timer">4:00</div>
+            <div class="mini-score">
+              <span class="s-correct" title="Doğru">✔ <b id="cnt-correct">0</b></span>
+              <span class="s-wrong" title="Yanlış">✘ <b id="cnt-wrong">0</b></span>
+              <span class="s-pass" title="Pas">↻ <b id="cnt-pass">0</b></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <p id="question" class="question"></p>
+        <div id="feedback" class="feedback" aria-live="polite"></div>
+
+        <form id="answer-form" class="answer-form" autocomplete="off">
+          <input id="answer" type="text" placeholder="Cevabını yaz…" enterkeyhint="send"
+                 autocapitalize="off" autocorrect="off" spellcheck="false" />
+          <button id="btn-mic" type="button" class="mic-btn" aria-label="Sesli cevap ver">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z"/></svg>
+          </button>
+        </form>
+        <div id="heard" class="heard"></div>
+
+        <div class="actions">
+          <button id="btn-pass" type="button" class="btn btn-pass">PAS</button>
+          <button id="btn-submit" type="button" class="btn btn-ok">CEVAPLA</button>
+        </div>
+        <button id="btn-repeat" type="button" class="link-btn small">🔊 Soruyu tekrar oku</button>
+      </div>
+    </div>
+
+    <div id="pause-overlay" class="overlay hidden">
+      <div class="overlay-card">
+        <h2>Duraklatıldı</h2>
+        <button id="btn-resume" class="btn btn-ok">DEVAM ET</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- SONUÇ -->
+  <section id="screen-result" class="screen">
+    <div class="result-head">
+      <h2 id="result-title">Oyun bitti!</h2>
+      <div class="result-score">
+        <div class="big"><b id="res-correct">0</b><span>Doğru</span></div>
+        <div class="big wrong"><b id="res-wrong">0</b><span>Yanlış</span></div>
+        <div class="big pass"><b id="res-empty">0</b><span>Boş</span></div>
+      </div>
+      <p id="res-best" class="res-best"></p>
+      <div class="actions">
+        <button id="btn-menu" class="btn btn-pass">MENÜ</button>
+        <button id="btn-again" class="btn btn-ok">TEKRAR OYNA</button>
+      </div>
+    </div>
+    <h3 class="section-title">Cevaplar</h3>
+    <ul id="result-list" class="result-list"></ul>
+  </section>
+
+  <!-- NASIL OYNANIR -->
+  <div id="howto" class="overlay hidden">
+    <div class="overlay-card howto">
+      <h2>Nasıl oynanır?</h2>
+      <ul>
+        <li>Çarkta Türk alfabesinin her harfi için bir soru var. Önce soru okunur, sonra harf söylenir: cevap o harfle <b>başlar</b> ya da “içinde … var” denirse o harfi <b>içerir</b>.</li>
+        <li>Cevabını yazıp <b>CEVAPLA</b>'ya bas ya da 🎤 düğmesine dokunup <b>söyle</b>.</li>
+        <li>Bilmiyorsan <b>PAS</b> de: o harf sarı olur, tur sonunda tekrar sana gelir. Sesli oynarken “pas” demen yeterli.</li>
+        <li>Süre bitmeden bütün harfleri tamamlamaya çalış. Yeşil = doğru, kırmızı = yanlış.</li>
+        <li>Küçük yazım hataları ve Türkçe karakter eksikleri (ş→s, ı→i…) tolere edilir.</li>
+      </ul>
+      <button id="btn-howto-close" class="btn btn-ok">ANLADIM</button>
+    </div>
+  </div>
+
+  <script src="questions.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="auth.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

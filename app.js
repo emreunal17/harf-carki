@@ -1,0 +1,617 @@
+"use strict";
+
+const LETTERS = ["A","B","C","Ç","D","E","F","G","H","I","İ","J","K","L","M","N","O","Ö","P","R","S","Ş","T","U","Ü","V","Y","Z"];
+// Harflerin Türkçe okunuşu (sesli okumada "Baş harfi Be" gibi doğru telaffuz için)
+const LETTER_SAY = { A:"a", B:"be", C:"ce", "Ç":"çe", D:"de", E:"e", F:"fe", G:"ge", H:"he", I:"ı", "İ":"i", J:"je", K:"ke", L:"le", M:"me", N:"ne", O:"o", "Ö":"ö", P:"pe", R:"re", S:"se", "Ş":"şe", T:"te", U:"u", "Ü":"ü", V:"ve", Y:"ye", Z:"ze" };
+const MIXED = { id: "karisik", name: "Karışık", icon: "🎲", color: "#3d7bff" };
+const AVATARS = ["🙂","😎","🤓","🦊","🐱","🐶","🐼","🦁","🐯","🐸","🐵","🦉","🐧","🐙","🦄","🐲","⚽","🏀","🎬","🎸","🚀","🌟","👑","🧠"];
+
+const $ = (id) => document.getElementById(id);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("harfcarki." + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("harfcarki." + k, JSON.stringify(v)); } catch {} },
+};
+
+/* ================= PROFİL & İSTATİSTİK ================= */
+function profileKey() { return "profile." + (Auth.user ? Auth.user.uid : "none"); }
+function getProfile() {
+  const u = Auth.user || { name: "Oyuncu" };
+  const p = store.get(profileKey(), null) || {};
+  return { name: p.name || u.name || "Oyuncu", avatar: p.avatar || "🙂", games: p.games || 0, correct: p.correct || 0, answered: p.answered || 0, best: p.best || {} };
+}
+function saveProfile(p) { store.set(profileKey(), p); }
+
+/* ================= METİN EŞLEŞTİRME ================= */
+const lower = (s) => s.toLocaleLowerCase("tr-TR");
+function normalize(s) {
+  return lower(String(s || ""))
+    .replace(/[’'`´]/g, "")
+    .replace(/[^a-zçğıöşüâîû0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+function fold(s) {
+  return normalize(s)
+    .replace(/ç/g, "c").replace(/ğ/g, "g").replace(/ı/g, "i").replace(/ö/g, "o")
+    .replace(/ş/g, "s").replace(/ü/g, "u").replace(/â/g, "a").replace(/î/g, "i").replace(/û/g, "u")
+    .replace(/\s/g, "");
+}
+function levenshtein(a, b) {
+  if (a === b) return 0;
+  const m = a.length, n = b.length;
+  if (!m) return n; if (!n) return m;
+  let prev = Array.from({ length: n + 1 }, (_, i) => i);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[n];
+}
+function isCorrect(input, q) {
+  const given = fold(input);
+  if (!given) return false;
+  return [q.a, ...(q.alt || [])].map(fold).some((ans) => {
+    if (given === ans) return true;
+    const tol = ans.length >= 9 ? 2 : ans.length >= 5 ? 1 : 0;
+    return levenshtein(given, ans) <= tol;
+  });
+}
+const PASS_WORDS = ["pas", "pass", "paso", "pas geç", "pas gec", "geç", "gec", "bilmiyorum", "sonraki"];
+function isPassWord(text) {
+  const n = normalize(text);
+  return PASS_WORDS.includes(n) || /^pas\b/.test(n);
+}
+
+/* ================= SES EFEKTLERİ ================= */
+let audioCtx = null;
+function beep(type) {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const notes = { ok: [660, 880], bad: [220, 160], pas: [520, 520], end: [523, 659, 784] }[type];
+    notes.forEach((f, i) => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = type === "bad" ? "sawtooth" : "sine";
+      o.frequency.value = f;
+      const t = audioCtx.currentTime + i * 0.12;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.18, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+      o.connect(g).connect(audioCtx.destination);
+      o.start(t); o.stop(t + 0.2);
+    });
+  } catch {}
+  if (navigator.vibrate && type === "bad") navigator.vibrate(120);
+}
+
+/* ================= SESLİ OKUMA (TTS) ================= */
+const synth = window.speechSynthesis;
+let trVoices = [];
+let speakId = 0;
+let liveUtterances = []; // Chrome, referansı tutulmayan konuşmaları yarıda kesebiliyor
+
+// Daha doğal sesleri öne al (Edge "Natural", Google, iOS "Gelişmiş/Premium" sesler)
+function voiceScore(v) {
+  const n = v.name.toLowerCase();
+  let s = 0;
+  if (/natural|neural|online|premium|enhanced|gelişmiş|wavenet/.test(n)) s += 20;
+  if (/google/.test(n)) s += 8;
+  if (/emel|ahmet|yelda|cem/.test(n)) s += 3;
+  if (/microsoft/.test(n)) s += 2;
+  if (v.localService === false) s += 1;
+  return s;
+}
+function loadVoices() {
+  if (!synth) return;
+  trVoices = synth.getVoices().filter((v) => /^tr([-_]|$)/i.test(v.lang)).sort((a, b) => voiceScore(b) - voiceScore(a));
+  const sel = $("opt-voice");
+  const saved = store.get("opt-voice", null);
+  sel.innerHTML = "";
+  if (!trVoices.length) {
+    sel.innerHTML = '<option value="">Cihazın varsayılan sesi</option>';
+  } else {
+    trVoices.forEach((v) => {
+      const o = document.createElement("option");
+      o.value = v.voiceURI;
+      o.textContent = prettyVoiceName(v) + (voiceScore(v) >= 20 ? " ★" : "");
+      sel.appendChild(o);
+    });
+    if (saved && trVoices.some((v) => v.voiceURI === saved)) sel.value = saved;
+  }
+  const best = trVoices[0];
+  let tip = "";
+  if (!trVoices.length) tip = "Cihazda Türkçe ses bulunamadı. Ayarlar → Erişilebilirlik → Metin okuma bölümünden Türkçe ses indirin.";
+  else if (!best || voiceScore(best) < 8) {
+    tip = /iPhone|iPad|Mac/.test(navigator.userAgent)
+      ? "Daha doğal ses için: Ayarlar → Erişilebilirlik → Seslendirilen İçerik → Sesler → Türkçe → Yelda (Gelişmiş) indirin."
+      : "Daha doğal ses için: Windows'ta Edge tarayıcısı, Android'de Google Konuşma Hizmetleri Türkçe sesini kullanın.";
+  }
+  $("voice-tip").textContent = tip;
+}
+function prettyVoiceName(v) {
+  return v.name.replace(/^Microsoft\s+/i, "").replace(/\s*-\s*Turkish.*$/i, "").replace(/\s*\(Turkey\)|\s*Türkçe \(Türkiye\)/gi, "").trim() || v.name;
+}
+function currentVoice() {
+  const uri = $("opt-voice").value;
+  return trVoices.find((v) => v.voiceURI === uri) || trVoices[0] || null;
+}
+if (synth) { loadVoices(); synth.onvoiceschanged = loadVoices; }
+
+// Ekranda okunacak metni konuşmaya uygun hâle getir
+function speechText(t) {
+  return String(t)
+    .replace(/\s*\.\.\.\s*/g, ", ")
+    .replace(/['’‘"“”]/g, "")
+    .replace(/(\d)\s*km\b/g, "$1 kilometre")
+    .replace(/\s+,/g, ",")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Parçaları sırayla okur; hepsi bitince onEnd çağrılır
+function speak(parts, onEnd) {
+  const done = (() => { let called = false; return () => { if (!called) { called = true; onEnd && onEnd(); } }; })();
+  if (!synth || !$("opt-tts").checked) { done(); return; }
+  const myId = ++speakId;
+  synth.cancel();
+  // cancel()'dan hemen sonra speak() bazı tarayıcılarda ilk kelimeleri yutuyor; kısa bekle
+  setTimeout(() => {
+    if (myId !== speakId) return;
+    const voice = currentVoice();
+    const rate = parseFloat($("opt-rate").value) || 0.95;
+    const list = [].concat(parts).filter(Boolean).map(speechText);
+    liveUtterances = list.map((text, i) => {
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = voice ? voice.lang : "tr-TR";
+      if (voice) u.voice = voice;
+      u.rate = rate;
+      u.pitch = 1;
+      if (i === list.length - 1) {
+        u.onend = () => { if (myId === speakId) done(); };
+        u.onerror = (e) => { if (myId === speakId && e.error !== "interrupted" && e.error !== "canceled") done(); };
+      }
+      return u;
+    });
+    liveUtterances.forEach((u) => synth.speak(u));
+    // Hiç başlayamazsa (ses motoru yok vb.) oyunu bekletme
+    setTimeout(() => { if (myId === speakId && !synth.speaking && !synth.pending) done(); }, 3000);
+  }, 120);
+}
+function stopSpeaking() { speakId++; if (synth) synth.cancel(); }
+
+function questionSpeech(it) {
+  const say = LETTER_SAY[it.letter] || it.letter;
+  const hint = it.q.c ? `İçinde ${say} harfi var.` : `Baş harfi ${say}.`;
+  return [it.q.s || it.q.q, hint];
+}
+
+/* ================= SESLE CEVAP (STT) ================= */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, listening = false;
+
+function startListening() {
+  if (!SR || listening || game.paused || game.over || game.busy) return;
+  rec = new SR();
+  rec.lang = "tr-TR";
+  rec.interimResults = true;
+  rec.maxAlternatives = 5;
+  rec.continuous = false;
+  const token = game.turn;
+
+  rec.onstart = () => { listening = true; $("btn-mic").classList.add("listening"); $("heard").textContent = "Dinliyorum… cevabını söyle (ya da “pas”)"; };
+  rec.onresult = (e) => {
+    const res = e.results[e.results.length - 1];
+    $("answer").value = res[0].transcript.trim();
+    if (!res.isFinal || token !== game.turn) return;
+    const alts = Array.from(res).map((a) => a.transcript.trim()).filter(Boolean);
+    $("heard").textContent = "Duyulan: “" + alts[0] + "”";
+    stopListening();
+    handleVoice(alts);
+  };
+  rec.onerror = (e) => {
+    if (e.error === "not-allowed" || e.error === "service-not-allowed") $("heard").textContent = "Mikrofon izni verilmedi. Tarayıcı ayarlarından izin verin.";
+    else if (e.error === "no-speech") $("heard").textContent = "Ses algılanamadı. 🎤 ile tekrar dene.";
+    else if (e.error !== "aborted") $("heard").textContent = "Ses tanıma hatası: " + e.error;
+  };
+  rec.onend = () => { listening = false; $("btn-mic").classList.remove("listening"); };
+  try { rec.start(); } catch {}
+}
+function stopListening() {
+  if (rec) { try { rec.abort(); } catch {} }
+  listening = false;
+  $("btn-mic").classList.remove("listening");
+}
+function handleVoice(alts) {
+  if (alts.some(isPassWord)) return pass();
+  const q = game.items[game.idx].q;
+  submit(alts.find((t) => isCorrect(t, q)) || alts[0]);
+}
+
+/* ================= OYUN ================= */
+const game = { items: [], idx: 0, time: 0, total: 0, timerId: null, paused: false, over: true, cat: null, turn: 0, busy: false, level: "" };
+
+function buildQuestions(cat) {
+  const pools = cat.id === MIXED.id ? CATEGORIES : [cat];
+  return LETTERS.map((L) => {
+    const options = pools.flatMap((c) => c.questions.filter((q) => q.l === L).map((q) => ({ ...q, cat: c.name })));
+    const q = options[Math.floor(Math.random() * options.length)];
+    return { letter: L, q, status: "pending", given: "" };
+  }).filter((it) => it.q);
+}
+
+function renderWheel() {
+  const wheel = $("wheel");
+  wheel.querySelectorAll(".bubble").forEach((b) => b.remove());
+  const n = game.items.length;
+  game.items.forEach((it, i) => {
+    const ang = (-90 + (360 / n) * i) * (Math.PI / 180);
+    const b = document.createElement("div");
+    b.className = "bubble";
+    b.id = "b-" + i;
+    b.textContent = it.letter;
+    b.style.left = 50 + 45 * Math.cos(ang) + "%";
+    b.style.top = 50 + 45 * Math.sin(ang) + "%";
+    wheel.appendChild(b);
+  });
+}
+function paintBubbles() {
+  game.items.forEach((it, i) => {
+    $("b-" + i).className = "bubble" + (it.status !== "pending" ? " " + it.status : "") + (i === game.idx && !game.over ? " current" : "");
+  });
+  const c = (s) => game.items.filter((it) => it.status === s).length;
+  $("cnt-correct").textContent = c("correct");
+  $("cnt-wrong").textContent = c("wrong");
+  $("cnt-pass").textContent = c("passed");
+}
+
+function startGame(cat) {
+  stopListening();
+  game.cat = cat;
+  game.items = buildQuestions(cat);
+  game.idx = 0;
+  game.total = parseInt($("opt-time").value, 10);
+  game.level = $("opt-time").selectedOptions[0].textContent.split("·")[0].trim();
+  game.time = game.total;
+  game.paused = false;
+  game.over = false;
+  game.busy = false;
+  $("game-category").innerHTML = escapeHtml(cat.icon + " " + cat.name) + '<span class="level-badge">' + escapeHtml(game.level) + "</span>";
+  flash("", "");
+  $("pause-overlay").classList.add("hidden");
+  renderWheel();
+  showScreen("game");
+  updateTimer();
+  clearInterval(game.timerId);
+  game.timerId = setInterval(tick, 1000);
+  showQuestion();
+}
+
+function tick() {
+  if (game.paused || game.over || !game.total) return;
+  game.time--;
+  updateTimer();
+  if (game.time <= 0) endGame("Süre doldu!");
+}
+function updateTimer() {
+  const el = $("timer");
+  if (!game.total) { el.textContent = "∞"; el.classList.remove("low"); return; }
+  const t = Math.max(0, game.time);
+  el.textContent = Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0");
+  el.classList.toggle("low", t <= 15);
+}
+
+function showQuestion() {
+  const it = game.items[game.idx];
+  game.turn++;
+  game.busy = false;
+  const rule = it.q.c ? "İçinde " + it.letter + " var" : "Baş harfi " + it.letter;
+  $("current-letter").textContent = it.letter;
+  $("letter-rule").textContent = it.q.c ? "içinde var" : "baş harfi";
+  $("question").innerHTML = '<span class="rule">' + escapeHtml(rule.toLocaleUpperCase("tr-TR") +
+    (game.cat.id === MIXED.id ? " · " + it.q.cat : "")) + "</span>" + escapeHtml(it.q.q);
+  $("answer").value = "";
+  $("heard").textContent = "";
+  paintBubbles();
+  const token = game.turn;
+  speak(questionSpeech(it), () => {
+    if ($("opt-handsfree").checked && token === game.turn && !game.paused && !game.over) startListening();
+  });
+}
+
+function submit(text) {
+  if (game.over || game.paused || game.busy) return;
+  const answer = (text ?? $("answer").value).trim();
+  if (!answer) { $("answer").focus(); flash("Bir cevap yaz ya da söyle 🙂", "pas"); return; }
+  if (isPassWord(answer)) return pass();
+  stopListening();
+  stopSpeaking();
+  const it = game.items[game.idx];
+  it.given = answer;
+  const panel = document.querySelector(".panel");
+  if (isCorrect(answer, it.q)) {
+    it.status = "correct";
+    beep("ok");
+    flash("✔ Doğru! " + it.q.a, "ok");
+  } else {
+    it.status = "wrong";
+    beep("bad");
+    flash("✘ Yanlış. Doğru cevap: " + it.q.a, "bad");
+    panel.classList.remove("shake"); void panel.offsetWidth; panel.classList.add("shake");
+  }
+  advance(it.status === "correct" ? 900 : 1900);
+}
+
+function pass() {
+  if (game.over || game.paused || game.busy) return;
+  stopListening();
+  stopSpeaking();
+  game.items[game.idx].status = "passed";
+  beep("pas");
+  flash("↻ Pas! Sonra tekrar gelecek.", "pas");
+  advance(600);
+}
+
+function advance(delay) {
+  game.busy = true;
+  paintBubbles();
+  setTimeout(() => {
+    if (game.over) return;
+    const next = findNext();
+    if (next === -1) return endGame();
+    game.idx = next;
+    flash("", "");
+    if (game.paused) { game.busy = false; return; }
+    showQuestion();
+  }, delay);
+}
+function findNext() {
+  const n = game.items.length;
+  for (let k = 1; k <= n; k++) {
+    const i = (game.idx + k) % n;
+    const s = game.items[i].status;
+    if (s === "pending" || s === "passed") return i;
+  }
+  return -1;
+}
+
+function flash(msg, cls) {
+  const f = $("feedback");
+  f.textContent = msg;
+  f.className = "feedback " + cls;
+}
+
+function setPaused(p) {
+  if (game.over) return;
+  game.paused = p;
+  $("pause-overlay").classList.toggle("hidden", !p);
+  if (p) { stopListening(); stopSpeaking(); }
+}
+
+function endGame(title) {
+  if (game.over) return;
+  game.over = true;
+  clearInterval(game.timerId);
+  stopListening();
+  stopSpeaking();
+  beep("end");
+  const c = game.items.filter((i) => i.status === "correct").length;
+  const w = game.items.filter((i) => i.status === "wrong").length;
+  const e = game.items.length - c - w;
+  $("result-title").textContent = c === game.items.length ? "🏆 Kusursuz! Tüm harfler doğru!" : (title || "Oyun bitti!");
+  $("res-correct").textContent = c;
+  $("res-wrong").textContent = w;
+  $("res-empty").textContent = e;
+
+  const p = getProfile();
+  p.games += 1; p.correct += c; p.answered += game.items.length;
+  const best = p.best[game.cat.id] || 0;
+  if (c > best) { p.best[game.cat.id] = c; $("res-best").textContent = "🎉 Yeni rekor! (" + game.cat.name + " · " + game.level + ")"; }
+  else $("res-best").textContent = "Rekorun: " + best + " doğru (" + game.cat.name + ") · Seviye: " + game.level;
+  saveProfile(p);
+
+  $("result-list").innerHTML = game.items.map((it) =>
+    '<li class="' + it.status + '"><div class="rl">' + it.letter + "</div><div>" +
+    '<div class="rq">' + escapeHtml(it.q.q) + "</div>" +
+    '<div class="ra">' + escapeHtml(it.q.a) + "</div>" +
+    (it.status === "wrong" ? '<div class="ry">Senin cevabın: ' + escapeHtml(it.given) + "</div>" : "") +
+    "</div></li>"
+  ).join("");
+  showScreen("result");
+  renderMenu();
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+}
+
+/* ================= EKRANLAR & MENÜ ================= */
+function showScreen(name) {
+  document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
+  $("screen-" + name).classList.add("active");
+  window.scrollTo(0, 0);
+}
+
+function renderMenu() {
+  const p = getProfile();
+  $("chip-avatar").textContent = p.avatar;
+  $("chip-name").textContent = p.name;
+  const grid = $("category-grid");
+  grid.innerHTML = "";
+  [...CATEGORIES, MIXED].forEach((cat) => {
+    const btn = document.createElement("button");
+    btn.className = "cat-card";
+    btn.style.setProperty("--c", cat.color);
+    const best = p.best[cat.id] || 0;
+    btn.innerHTML = '<span class="ico">' + cat.icon + '</span><span><div class="name">' + escapeHtml(cat.name) +
+      '</div><div class="best">' + (best ? "Rekor: " + best + "/" + LETTERS.length : "Henüz oynanmadı") + "</div></span>";
+    btn.onclick = () => startGame(cat);
+    grid.appendChild(btn);
+  });
+}
+
+/* ---------- Profil ekranı ---------- */
+let pendingAvatar = null;
+function openProfile() {
+  const p = getProfile();
+  const u = Auth.user;
+  pendingAvatar = p.avatar;
+  $("profile-avatar").textContent = p.avatar;
+  $("profile-name").value = p.name;
+  const how = { google: "Google hesabı", facebook: "Facebook hesabı", email: "E-posta hesabı", local: "Misafir · yalnızca bu cihazda" }[u.provider] || "";
+  $("profile-account").textContent = how + (u.email ? " · " + u.email : "");
+  $("btn-logout").textContent = u.provider === "local" ? "MİSAFİR PROFİLİNİ SİL / ÇIKIŞ" : "ÇIKIŞ YAP";
+  $("avatar-grid").innerHTML = "";
+  AVATARS.forEach((a) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = a;
+    if (a === pendingAvatar) b.classList.add("sel");
+    b.onclick = () => {
+      pendingAvatar = a; $("profile-avatar").textContent = a;
+      $("avatar-grid").querySelectorAll("button").forEach((x) => x.classList.toggle("sel", x === b));
+    };
+    $("avatar-grid").appendChild(b);
+  });
+  $("st-games").textContent = p.games;
+  $("st-correct").textContent = p.correct;
+  $("st-rate").textContent = "%" + (p.answered ? Math.round((p.correct / p.answered) * 100) : 0);
+  const rows = [...CATEGORIES, MIXED].filter((c) => p.best[c.id]).map((c) =>
+    "<li><span>" + c.icon + " " + escapeHtml(c.name) + "</span><b>" + p.best[c.id] + "/" + LETTERS.length + "</b></li>");
+  $("st-best").innerHTML = rows.length ? rows.join("") : '<li><span>Henüz rekor yok. Hadi bir oyun oyna!</span></li>';
+  showScreen("profile");
+}
+
+/* ---------- Giriş ekranı ---------- */
+let registerMode = false;
+function setAuthMsg(msg, cls) { const m = $("auth-msg"); m.textContent = msg; m.className = "auth-msg " + (cls || ""); }
+function setupLoginScreen() {
+  const on = Auth.enabled;
+  $("btn-google").disabled = !on;
+  $("btn-facebook").disabled = !on;
+  $("email-form").classList.toggle("disabled", !on);
+  $("auth-setup-note").classList.toggle("hidden", on);
+}
+function toggleRegister(force) {
+  registerMode = force ?? !registerMode;
+  document.querySelectorAll(".only-register").forEach((el) => el.classList.toggle("hidden", !registerMode));
+  $("btn-email").textContent = registerMode ? "HESAP AÇ" : "GİRİŞ YAP";
+  $("btn-toggle-register").innerHTML = registerMode ? "Zaten hesabın var mı? <b>Giriş yap</b>" : "Hesabın yok mu? <b>Hesap aç</b>";
+  $("password").autocomplete = registerMode ? "new-password" : "current-password";
+  setAuthMsg("");
+}
+async function runAuth(fn) {
+  setAuthMsg("Bekleyin…");
+  try { const u = await fn(); if (u) { setAuthMsg(""); afterLogin(); } }
+  catch (e) { setAuthMsg(e.message, "bad"); }
+}
+function afterLogin() {
+  const u = Auth.user;
+  if (!u) { setupLoginScreen(); showScreen("login"); return; }
+  const p = getProfile();
+  if (!store.get(profileKey(), null)) saveProfile(p); // ilk girişte profil oluştur
+  renderMenu();
+  showScreen("menu");
+}
+
+/* ---------- Ayarlar ---------- */
+function rateLabel(v) { v = parseFloat(v); return v < 0.88 ? "Yavaş" : v > 1.08 ? "Hızlı" : "Normal"; }
+function initSettings() {
+  ["opt-time", "opt-tts", "opt-handsfree", "opt-rate"].forEach((id) => {
+    const el = $(id);
+    const saved = store.get(id, null);
+    if (saved !== null) el.type === "checkbox" ? (el.checked = saved) : (el.value = saved);
+    el.addEventListener("change", () => store.set(id, el.type === "checkbox" ? el.checked : el.value));
+  });
+  $("rate-label").textContent = rateLabel($("opt-rate").value);
+  $("opt-rate").addEventListener("input", () => { $("rate-label").textContent = rateLabel($("opt-rate").value); });
+  $("opt-voice").addEventListener("change", () => { store.set("opt-voice", $("opt-voice").value); testVoice(); });
+  $("btn-voice-test").addEventListener("click", testVoice);
+  if (!synth) $("voice-row").classList.add("hidden");
+
+  if (!SR) {
+    $("btn-mic").classList.add("hidden");
+    $("opt-handsfree").closest(".setting").classList.add("hidden");
+    const w = $("voice-warning");
+    w.textContent = "Bu tarayıcı sesli cevabı desteklemiyor. Sesli oynamak için Android'de Chrome, iPhone/iPad'de Safari kullanın.";
+    w.classList.remove("hidden");
+  } else if (!window.isSecureContext) {
+    const w = $("voice-warning");
+    w.textContent = "Sesli cevap için oyun https:// adresinden açılmalı.";
+    w.classList.remove("hidden");
+  }
+}
+function testVoice() {
+  const was = $("opt-tts").checked;
+  $("opt-tts").checked = true;
+  speak(["Türkiye Cumhuriyeti'nin başkenti.", "Baş harfi a."]);
+  $("opt-tts").checked = was;
+}
+
+/* ================= OLAYLAR ================= */
+$("answer-form").addEventListener("submit", (e) => { e.preventDefault(); submit(); });
+$("btn-submit").addEventListener("click", () => submit());
+$("btn-pass").addEventListener("click", () => pass());
+$("btn-mic").addEventListener("click", () => { if (listening) stopListening(); else { stopSpeaking(); startListening(); } });
+$("btn-repeat").addEventListener("click", () => { const it = game.items[game.idx]; if (it && !game.over) speak(questionSpeech(it)); });
+$("btn-pause").addEventListener("click", () => setPaused(true));
+$("btn-resume").addEventListener("click", () => { setPaused(false); if (!game.busy) showQuestion(); });
+$("btn-quit").addEventListener("click", () => {
+  if (!game.over && !confirm("Oyundan çıkılsın mı?")) return;
+  game.over = true; clearInterval(game.timerId); stopListening(); stopSpeaking();
+  showScreen("menu");
+});
+$("btn-again").addEventListener("click", () => startGame(game.cat));
+$("btn-menu").addEventListener("click", () => showScreen("menu"));
+$("btn-howto").addEventListener("click", () => $("howto").classList.remove("hidden"));
+$("btn-howto-close").addEventListener("click", () => $("howto").classList.add("hidden"));
+document.addEventListener("visibilitychange", () => { if (document.hidden && !game.over && !game.paused) setPaused(true); });
+
+// Profil
+$("btn-profile").addEventListener("click", openProfile);
+$("btn-profile-back").addEventListener("click", () => showScreen("menu"));
+$("btn-profile-save").addEventListener("click", () => {
+  const p = getProfile();
+  p.name = $("profile-name").value.trim().slice(0, 20) || p.name;
+  p.avatar = pendingAvatar || p.avatar;
+  saveProfile(p);
+  renderMenu();
+  showScreen("menu");
+});
+$("btn-logout").addEventListener("click", async () => {
+  const local = Auth.user && Auth.user.provider === "local";
+  if (!confirm(local ? "Misafir profilin ve bu cihazdaki istatistiklerin silinecek. Emin misin?" : "Çıkış yapılsın mı?")) return;
+  if (local) { try { localStorage.removeItem("harfcarki." + profileKey()); } catch {} }
+  await Auth.logout();
+  toggleRegister(false);
+  afterLogin();
+});
+
+// Giriş
+$("btn-google").addEventListener("click", () => runAuth(() => Auth.social("google")));
+$("btn-facebook").addEventListener("click", () => runAuth(() => Auth.social("facebook")));
+$("btn-toggle-register").addEventListener("click", () => toggleRegister());
+$("email-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const email = $("email").value.trim(), pass = $("password").value;
+  runAuth(() => registerMode ? Auth.emailRegister($("reg-name").value.trim(), email, pass) : Auth.emailLogin(email, pass));
+});
+$("btn-forgot").addEventListener("click", async () => {
+  const email = $("email").value.trim();
+  if (!email) return setAuthMsg("Önce e-posta adresini yaz.", "bad");
+  try { await Auth.resetPassword(email); setAuthMsg("Şifre sıfırlama bağlantısı e-postana gönderildi.", "ok"); }
+  catch (e) { setAuthMsg(e.message, "bad"); }
+});
+$("btn-guest").addEventListener("click", () => {
+  const name = (prompt("Adın ne? (Profilde görünecek)", "Misafir") || "").trim().slice(0, 20) || "Misafir";
+  Auth.guest(name);
+  const p = getProfile(); p.name = name; saveProfile(p);
+  afterLogin();
+});
+Auth.onChange(() => { if (!document.querySelector("#screen-game.active")) afterLogin(); });
+
+/* ================= BAŞLAT ================= */
+initSettings();
+Auth.init().then(afterLogin);
+
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
