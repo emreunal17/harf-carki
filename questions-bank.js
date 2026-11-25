@@ -244,7 +244,7 @@ addQuestions("genel", [
   {"l": "A", "q": "Başkenti Kanberra olan ülke", "a": "Avustralya"},
   {"l": "Y", "q": "Başkenti Wellington olan ülke", "a": "Yeni Zelanda"},
   {"l": "K", "q": "Başkenti Ottawa olan ülke", "a": "Kanada"},
-  {"l": "A", "q": "Başkenti Washington olan ülke", "a": "Amerika Birleşik Devletleri"},
+  {"l": "A", "q": "Başkenti Washington olan ülke", "a": "Amerika Birleşik Devletleri", "alt": ["ABD", "Amerika", "Birleşik Devletler"]},
   {"l": "M", "q": "Başkenti Meksiko olan ülke", "a": "Meksika"},
   {"l": "K", "q": "Başkenti Havana olan ülke", "a": "Küba"},
   {"l": "K", "q": "Başkenti Bogota olan ülke", "a": "Kolombiya"},

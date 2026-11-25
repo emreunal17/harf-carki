@@ -402,18 +402,24 @@ function buildQuestions(cat) {
   const pools = cat.id === MIXED.id ? CATEGORIES : [cat];
   const seen = store.get("seen", []);
   const seenSet = new Set(seen);
+  // Aynı kalıptaki sorular (ör. "… başkenti") bir oyunda en fazla 2 kez gelsin
+  const pattern = (q) => /başkent/i.test(q.q) ? "başkent" : normalize(q.q).trim().split(/\s+/).pop();
+  const patCount = {};
   const items = LETTERS.map((L) => {
     const options = pools.flatMap((c) => c.questions.filter((q) => q.l === L).map((q) => ({ ...q, cat: c.name, catId: c.id, key: qKey(c.id, q) })));
     if (!options.length) return null;
-    const fresh = options.filter((q) => !seenSet.has(q.key));
+    const varied = options.filter((q) => (patCount[pattern(q)] || 0) < 2);
+    const cands = varied.length ? varied : options;
+    const fresh = cands.filter((q) => !seenSet.has(q.key));
     let pool = fresh;
     if (!fresh.length) {
       // Bu harfin bütün soruları görüldüyse en eskisinden başla
       const order = (q) => seen.indexOf(q.key);
-      const oldest = Math.min(...options.map(order));
-      pool = options.filter((q) => order(q) === oldest);
+      const oldest = Math.min(...cands.map(order));
+      pool = cands.filter((q) => order(q) === oldest);
     }
     const q = pool[Math.floor(Math.random() * pool.length)];
+    const p = pattern(q); patCount[p] = (patCount[p] || 0) + 1;
     return { letter: L, q, status: "pending", given: "" };
   }).filter(Boolean);
   const used = new Set(items.map((it) => it.q.key));
@@ -1166,6 +1172,14 @@ function initSettings() {
   });
   $("rate-label").textContent = rateLabel($("opt-rate").value);
   paintTimeChip();
+  // Sesli okuma kapalıyken ses ve hız ayarları soluk ve kullanılamaz görünsün
+  const paintTts = () => {
+    const on = $("opt-tts").checked;
+    ["voice-row", "rate-row"].forEach((id) => $(id).classList.toggle("off", !on));
+    $("opt-voice").disabled = $("opt-rate").disabled = !on;
+  };
+  $("opt-tts").addEventListener("change", paintTts);
+  paintTts();
   $("opt-rate").addEventListener("input", () => { $("rate-label").textContent = rateLabel($("opt-rate").value); });
   $("opt-voice").addEventListener("change", () => { store.set("opt-voice", $("opt-voice").value); loadVoices(); testVoice(); });
   $("btn-voice-test").addEventListener("click", testVoice);

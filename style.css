@@ -1112,3 +1112,6 @@ html[data-theme="kagit"] .setting select option, html[data-theme="sakin"] .setti
 .store-note { font-size: 13px; color: var(--accent-text-2); margin: 6px 0 0; }
 
 .privacy-link { display: block; margin-top: 10px; text-align: center; font-size: 12px; color: var(--muted, #9aa); text-decoration: underline; }
+
+.setting.off { opacity: .45; }
+.setting.off select, .setting.off input[type=range] { pointer-events: none; }
