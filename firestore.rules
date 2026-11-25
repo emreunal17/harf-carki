@@ -97,6 +97,22 @@ service cloud.firestore {
       allow delete: if isOwner(uid);
     }
 
+    // JOKER CÜZDANI: wallets/{uid} { half, hint, starter?, updatedAt }
+    // Jokerleri yalnızca sunucu (satın alma doğrulaması) ekler; oyuncu kullanırken tek seferde 1 azaltabilir.
+    match /wallets/{uid} {
+      allow get: if isOwner(uid);
+      allow update: if isOwner(uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['half', 'hint'])
+        && request.resource.data.half is int && request.resource.data.hint is int
+        && request.resource.data.half >= 0 && request.resource.data.hint >= 0
+        && ((request.resource.data.half == resource.data.half - 1 && request.resource.data.hint == resource.data.hint)
+          || (request.resource.data.hint == resource.data.hint - 1 && request.resource.data.half == resource.data.half));
+    }
+    // İşlenmiş satın almalar: yalnızca sunucu
+    match /purchases/{id} {
+      allow read, write: if false;
+    }
+
     match /rooms/{code} {
       allow get: if request.auth != null;
       allow create: if request.auth != null && code.size() == 5

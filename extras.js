@@ -148,6 +148,7 @@ function currentStreak(p) {
 
 function paintMenuExtras() {
   ensureGift();
+  if (typeof Wallet !== "undefined") Wallet.watch();
   const p = getProfile();
   const st = currentStreak(p);
   const pill = $("streak-pill");
@@ -239,7 +240,7 @@ function renderBadgeGrid(p) {
     el.onclick = () => toast(b.icon + " " + b.name + " — " + b.desc + (got[b.id] ? " ✔ (" + trDate(got[b.id]) + ")" : ""), 3200);
     grid.appendChild(el);
   });
-  const bag = jokerBag(p);
+  const bag = totalBag(p);
   $("joker-bag").textContent = "Jokerlerin: ½ × " + bag.half + " · 💡 × " + bag.hint;
   $("badge-count").textContent = Object.keys(got).filter(badgeById).length + "/" + BADGES.length;
 }
@@ -284,17 +285,17 @@ function ensureGift() {
   saveProfile(p);
   setTimeout(() => toast("🎁 Hoş geldin hediyesi: " + JOKER_GIFT.half + " × ½ ve " + JOKER_GIFT.hint + " × 💡 joker!", 4000), 700);
 }
+// Hediye/kazanılan jokerler cihazda, satın alınanlar hesapta (store.js → Wallet)
+const paidBag = () => (typeof Wallet !== "undefined" ? Wallet.bag() : { half: 0, hint: 0 });
+function totalBag(p) { const a = jokerBag(p), b = paidBag(); return { half: a.half + b.half, hint: a.hint + b.hint }; }
 function spendJoker(k) {
   const p = getProfile();
   const bag = jokerBag(p);
-  if (!(bag[k] > 0)) {
-    toast("Bu jokerin kalmadı. Günün çarkını bitirerek, seri yaparak ve rozet kazanarak yeni joker kazanırsın 🎁", 4000);
-    return false;
-  }
-  bag[k]--;
-  p.jokers = bag;
-  saveProfile(p);
-  return true;
+  if (bag[k] > 0) { bag[k]--; p.jokers = bag; saveProfile(p); return true; }
+  if (paidBag()[k] > 0) { Wallet.spend(k); return true; }
+  const shop = typeof Store !== "undefined" && Store.available();
+  toast("Bu jokerin kalmadı. Günün çarkını bitirerek, seri yaparak ve rozet kazanarak yeni joker kazanırsın 🎁" + (shop ? " Profilindeki 🛒 Joker Al'dan da alabilirsin." : ""), 4500);
+  return false;
 }
 function resetJokers() {
   game.jokers = { half: 1, hint: 1 }; // bu oyunda kullanılabilecek
@@ -304,7 +305,7 @@ function resetJokers() {
 }
 function paintJokers() {
   const j = game.jokers || { half: 0, hint: 0 };
-  const bag = jokerBag(getProfile());
+  const bag = totalBag(getProfile());
   [["half", "jk-half"], ["hint", "jk-hint"]].forEach(([k, id]) => {
     const b = $(id);
     b.dataset.n = bag[k];
@@ -331,7 +332,7 @@ function showReward(r, p) {
   el.style.setProperty("--i", box.children.length);
   el.innerHTML = '<span class="nb-ico">🎁</span><span><b></b><small></small></span>';
   el.querySelector("b").textContent = "Joker kazandın: " + [r.half ? "+" + r.half + " × ½" : "", r.hint ? "+" + r.hint + " × 💡" : ""].filter(Boolean).join("  ");
-  el.querySelector("small").textContent = "Jokerlerin: ½ × " + jokerBag(p).half + " · 💡 × " + jokerBag(p).hint;
+  el.querySelector("small").textContent = "Jokerlerin: ½ × " + totalBag(p).half + " · 💡 × " + totalBag(p).hint;
   box.appendChild(el);
 }
 function hintText(a) {

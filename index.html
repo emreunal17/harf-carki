@@ -10,12 +10,13 @@
   <meta name="apple-mobile-web-app-title" content="Harf Çarkı" />
   <title>Harf Çarkı — Kelime Yarışması</title>
   <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@400;500;600;700;800&display=swap" />
-  <link rel="stylesheet" href="style.css?v=22" />
+  <link rel="stylesheet" href="style.css?v=23" />
 </head>
 <body>
   <!-- GİRİŞ / HESAP AÇ -->
@@ -81,6 +82,7 @@
     <div id="avatar-grid" class="avatar-grid"></div>
 
     <p id="joker-bag" class="joker-bag"></p>
+    <button id="btn-store" class="chip-btn store-btn hidden" type="button">🛒 Joker Al</button>
     <h3 class="section-title">Rozetler · <span id="badge-count">0</span></h3>
     <div id="badge-grid" class="badge-grid"></div>
 
@@ -348,6 +350,7 @@
         <p id="voice-tip" class="voice-tip"></p>
       </div>
       <button id="btn-settings-close" class="btn btn-ok wide" type="button">TAMAM</button>
+      <a class="privacy-link" href="gizlilik.html" target="_blank" rel="noopener">Gizlilik politikası</a>
     </div>
   </div>
 
@@ -360,6 +363,17 @@
       <p id="dd-next" class="dd-next"></p>
       <button id="btn-dd-share" class="btn btn-ok wide" type="button">📤 SONUCU PAYLAŞ</button>
       <button id="btn-dd-close" class="link-btn" type="button">Kapat</button>
+    </div>
+  </div>
+
+  <div id="store" class="overlay hidden" role="dialog" aria-labelledby="store-title">
+    <div class="overlay-card store-card">
+      <h2 id="store-title">🛒 Joker Mağazası</h2>
+      <p id="store-bag" class="store-bag"></p>
+      <div id="store-list" class="store-list"></div>
+      <p class="store-info">½ bir yanlış şıkkı siler, 💡 cevabın ilk iki harfini gösterir. Bir oyunda her birinden en fazla 1 kullanılır. Ücretsiz jokerler günün çarkı, seri ve rozetlerle kazanılmaya devam eder.</p>
+      <p id="store-note" class="store-note"></p>
+      <button id="btn-store-close" class="link-btn" type="button">Kapat</button>
     </div>
   </div>
 
@@ -381,14 +395,15 @@
     </div>
   </div>
 
-  <script src="speech-text.js?v=22"></script>
-  <script src="questions.js?v=22"></script>
-  <script src="questions-extra.js?v=22"></script>
-  <script src="questions-choices.js?v=22"></script>
-  <script src="firebase-config.js?v=22"></script>
-  <script src="auth.js?v=22"></script>
-  <script src="online.js?v=22"></script>
-  <script src="app.js?v=22"></script>
-  <script src="extras.js?v=22"></script>
+  <script src="speech-text.js?v=23"></script>
+  <script src="questions.js?v=23"></script>
+  <script src="questions-extra.js?v=23"></script>
+  <script src="questions-choices.js?v=23"></script>
+  <script src="firebase-config.js?v=23"></script>
+  <script src="auth.js?v=23"></script>
+  <script src="online.js?v=23"></script>
+  <script src="app.js?v=23"></script>
+  <script src="extras.js?v=23"></script>
+  <script src="store.js?v=23"></script>
 </body>
 </html>

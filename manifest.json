@@ -1,15 +1,50 @@
 {
   "name": "Harf Çarkı — Kelime Yarışması",
   "short_name": "Harf Çarkı",
-  "description": "Her harfe bir soru: yazarak ya da sesle cevapla.",
+  "description": "Her harfe bir soru! 3 şıktan doğrusunu seç ya da cevabını söyle. Günün çarkı, arkadaşlarla online oyun ve liderlik tablosu.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "orientation": "any",
+  "orientation": "portrait",
   "background_color": "#0a0c18",
   "theme_color": "#0a0c18",
   "lang": "tr",
   "icons": [
-    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "id": "./",
+  "categories": [
+    "games",
+    "education",
+    "entertainment"
   ]
 }
