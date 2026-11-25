@@ -1,6 +1,6 @@
 // Çevrimdışı çalışma için basit önbellek. Dosyaları güncellediğinizde VERSION'ı artırın.
-const VERSION = "harfcarki-v4";
-const FILES = ["./", "./index.html", "./style.css", "./app.js", "./questions.js", "./auth.js", "./firebase-config.js", "./manifest.json", "./icon.svg"];
+const VERSION = "harfcarki-v5";
+const FILES = ["./", "./index.html", "./style.css", "./app.js", "./questions.js", "./speech-text.js", "./auth.js", "./firebase-config.js", "./manifest.json", "./icon.svg"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));

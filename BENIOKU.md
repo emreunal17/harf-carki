@@ -57,3 +57,14 @@ Soruları cihazın kendi Türkçe sesi okur. Menüdeki **Okuyan ses** listesinde
 - **iPhone/iPad:** Ayarlar → Erişilebilirlik → Seslendirilen İçerik → Sesler → Türkçe → *Yelda (Gelişmiş)* indirin.
 - **Android:** Ayarlar → Metin okuma → Google Konuşma Hizmetleri → Türkçe ses verisini yükleyin.
 - **Windows:** Edge tarayıcısında "Emel/Ahmet Online (Natural)" sesleri çok daha doğaldır.
+
+### Doğal stüdyo sesi (ElevenLabs)
+Sorular ElevenLabs ile önceden seslendirilip `audio/` klasörüne konabilir. Dosyalar varsa menüde **🎙 Oğuz · stüdyo sesi** seçeneği çıkar ve varsayılan olur; dosyası olmayan sorular cihaz sesiyle okunur.
+
+```powershell
+$env:ELEVENLABS_API_KEY = "anahtarınız"   # elevenlabs.io → Developers → API Keys (Text to Speech izni yeterli)
+node tools/seslendir.mjs --dry            # kaç ses üretileceğini gösterir, kredi harcamaz
+node tools/seslendir.mjs --limit 3        # önce 3 tane dene
+node tools/seslendir.mjs                  # hepsini üret (224 soru ≈ 10.000 kredi)
+```
+Soru ekleyip değiştirdikten sonra komutu tekrar çalıştırın: yalnızca yeni/değişen sorular seslendirilir. Başka bir ses için `--voice <voice_id>`, ad için `--voice-name "Öykü"` ekleyin.

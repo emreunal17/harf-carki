@@ -1,8 +1,6 @@
 "use strict";
 
 const LETTERS = ["A","B","C","Ç","D","E","F","G","H","I","İ","J","K","L","M","N","O","Ö","P","R","S","Ş","T","U","Ü","V","Y","Z"];
-// Harflerin Türkçe okunuşu (sesli okumada "Baş harfi Be" gibi doğru telaffuz için)
-const LETTER_SAY = { A:"a", B:"be", C:"ce", "Ç":"çe", D:"de", E:"e", F:"fe", G:"ge", H:"he", I:"ı", "İ":"i", J:"je", K:"ke", L:"le", M:"me", N:"ne", O:"o", "Ö":"ö", P:"pe", R:"re", S:"se", "Ş":"şe", T:"te", U:"u", "Ü":"ü", V:"ve", Y:"ye", Z:"ze" };
 const MIXED = { id: "karisik", name: "Karışık", icon: "🎲", color: "#3d7bff" };
 const AVATARS = ["🙂","😎","🤓","🦊","🐱","🐶","🐼","🦁","🐯","🐸","🐵","🦉","🐧","🐙","🦄","🐲","⚽","🏀","🎬","🎸","🚀","🌟","👑","🧠"];
 
@@ -157,6 +155,16 @@ const synth = window.speechSynthesis;
 let trVoices = [];
 let speakId = 0;
 let liveUtterances = []; // Chrome, referansı tutulmayan konuşmaları yarıda kesebiliyor
+const STUDIO = "studio";
+let studio = null; // { voiceName, clips: { metin: dosya } }  — audio/manifest.json
+let liveAudio = null;
+function loadStudio() {
+  return fetch("audio/manifest.json", { cache: "no-cache" })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((m) => { if (m && m.clips && Object.keys(m.clips).length) { studio = m; loadVoices(); } })
+    .catch(() => {});
+}
+const useStudio = () => !!studio && $("opt-voice").value === STUDIO;
 
 // Daha doğal sesleri öne al (Edge "Natural", Google, iOS "Gelişmiş/Premium" sesler)
 function voiceScore(v) {
@@ -170,13 +178,18 @@ function voiceScore(v) {
   return s;
 }
 function loadVoices() {
-  if (!synth) return;
-  trVoices = synth.getVoices().filter((v) => /^tr([-_]|$)/i.test(v.lang)).sort((a, b) => voiceScore(b) - voiceScore(a));
+  trVoices = !synth ? [] : synth.getVoices().filter((v) => /^tr([-_]|$)/i.test(v.lang)).sort((a, b) => voiceScore(b) - voiceScore(a));
   const sel = $("opt-voice");
   const saved = store.get("opt-voice", null);
   sel.innerHTML = "";
+  if (studio) {
+    const o = document.createElement("option");
+    o.value = STUDIO;
+    o.textContent = "🎙 " + (studio.voiceName || "Doğal ses") + " · stüdyo sesi ★★";
+    sel.appendChild(o);
+  }
   if (!trVoices.length) {
-    sel.innerHTML = '<option value="">Cihazın varsayılan sesi</option>';
+    if (!studio) sel.innerHTML = '<option value="">Cihazın varsayılan sesi</option>';
   } else {
     trVoices.forEach((v) => {
       const o = document.createElement("option");
@@ -184,11 +197,14 @@ function loadVoices() {
       o.textContent = prettyVoiceName(v) + (voiceScore(v) >= 20 ? " ★" : "");
       sel.appendChild(o);
     });
-    if (saved && trVoices.some((v) => v.voiceURI === saved)) sel.value = saved;
   }
+  if (saved && [...sel.options].some((o) => o.value === saved)) sel.value = saved;
+  else if (studio) sel.value = STUDIO;
+  if (studio || trVoices.length) $("voice-row").classList.remove("hidden");
   const best = trVoices[0];
   let tip = "";
-  if (!trVoices.length) tip = "Cihazda Türkçe ses bulunamadı. Ayarlar → Erişilebilirlik → Metin okuma bölümünden Türkçe ses indirin.";
+  if (useStudio()) tip = "";
+  else if (!trVoices.length) tip = "Cihazda Türkçe ses bulunamadı. Ayarlar → Erişilebilirlik → Metin okuma bölümünden Türkçe ses indirin.";
   else if (!best || voiceScore(best) < 8) {
     tip = /iPhone|iPad|Mac/.test(navigator.userAgent)
       ? "Daha doğal ses için: Ayarlar → Erişilebilirlik → Seslendirilen İçerik → Sesler → Türkçe → Yelda (Gelişmiş) indirin."
@@ -205,21 +221,31 @@ function currentVoice() {
 }
 if (synth) { loadVoices(); synth.onvoiceschanged = loadVoices; }
 
-// Ekranda okunacak metni konuşmaya uygun hâle getir
-function speechText(t) {
-  return String(t)
-    .replace(/\s*\.\.\.\s*/g, ", ")
-    .replace(/['’‘"“”]/g, "")
-    .replace(/(\d)\s*km\b/g, "$1 kilometre")
-    .replace(/\s+,/g, ",")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-// Parçaları sırayla okur; hepsi bitince onEnd çağrılır
-function speak(parts, onEnd) {
+// Parçaları sırayla okur; hepsi bitince onEnd çağrılır.
+// clipKey verilirse ve stüdyo sesi seçiliyse hazır ses dosyası çalınır; olmazsa cihaz sesine düşer.
+function speak(parts, onEnd, clipKey) {
   const done = (() => { let called = false; return () => { if (!called) { called = true; onEnd && onEnd(); } }; })();
-  if (!synth || !$("opt-tts").checked) { done(); return; }
+  if (!$("opt-tts").checked) { done(); return; }
+  const rate = parseFloat($("opt-rate").value) || 0.95;
+  const file = useStudio() && clipKey && studio.clips[clipKey];
+  if (file) {
+    const myId = ++speakId;
+    if (synth) synth.cancel();
+    if (liveAudio) liveAudio.pause();
+    const a = new Audio("audio/" + file);
+    liveAudio = a;
+    a.playbackRate = Math.min(1.3, Math.max(0.75, rate / 0.95));
+    const fallback = () => { if (myId === speakId) { liveAudio = null; speakDevice(parts, done); } };
+    a.onended = () => { if (myId === speakId) done(); };
+    a.onerror = fallback;
+    const p = a.play();
+    if (p && p.catch) p.catch(fallback);
+    return;
+  }
+  speakDevice(parts, done);
+}
+function speakDevice(parts, done) {
+  if (!synth) { done(); return; }
   const myId = ++speakId;
   synth.cancel();
   // cancel()'dan hemen sonra speak() bazı tarayıcılarda ilk kelimeleri yutuyor; kısa bekle
@@ -245,12 +271,17 @@ function speak(parts, onEnd) {
     setTimeout(() => { if (myId === speakId && !synth.speaking && !synth.pending) done(); }, 3000);
   }, 120);
 }
-function stopSpeaking() { speakId++; if (synth) synth.cancel(); }
+function stopSpeaking() {
+  speakId++;
+  if (synth) synth.cancel();
+  if (liveAudio) { liveAudio.pause(); liveAudio = null; }
+}
 
 function questionSpeech(it) {
-  const say = LETTER_SAY[it.letter] || it.letter;
-  const hint = it.q.c ? `İçinde ${say} harfi var.` : `Baş harfi ${say}.`;
-  return [it.q.s || it.q.q, hint];
+  return [it.q.s || it.q.q, letterHint(it.q, it.letter)];
+}
+function speakQuestion(it, onEnd) {
+  speak(questionSpeech(it), onEnd, clipText(it.q, it.letter));
 }
 
 /* ================= SESLE CEVAP (STT) ================= */
@@ -381,7 +412,7 @@ function showQuestion() {
   $("heard").textContent = "";
   paintBubbles();
   const token = game.turn;
-  speak(questionSpeech(it), () => {
+  speakQuestion(it, () => {
     if ($("opt-handsfree").checked && token === game.turn && !game.paused && !game.over) startListening();
   });
 }
@@ -676,9 +707,10 @@ function initSettings() {
   });
   $("rate-label").textContent = rateLabel($("opt-rate").value);
   $("opt-rate").addEventListener("input", () => { $("rate-label").textContent = rateLabel($("opt-rate").value); });
-  $("opt-voice").addEventListener("change", () => { store.set("opt-voice", $("opt-voice").value); testVoice(); });
+  $("opt-voice").addEventListener("change", () => { store.set("opt-voice", $("opt-voice").value); loadVoices(); testVoice(); });
   $("btn-voice-test").addEventListener("click", testVoice);
   if (!synth) $("voice-row").classList.add("hidden");
+  loadStudio();
 
   if (!SR) {
     $("btn-mic").classList.add("hidden");
@@ -695,7 +727,8 @@ function initSettings() {
 function testVoice() {
   const was = $("opt-tts").checked;
   $("opt-tts").checked = true;
-  speak(["Türkiye Cumhuriyeti'nin başkenti.", "Baş harfi a."]);
+  const q = CATEGORIES[0].questions[0];
+  speak(questionSpeech({ q, letter: q.l }), null, clipText(q, q.l));
   $("opt-tts").checked = was;
 }
 
@@ -704,7 +737,7 @@ $("answer-form").addEventListener("submit", (e) => { e.preventDefault(); submit(
 $("btn-submit").addEventListener("click", () => submit());
 $("btn-pass").addEventListener("click", () => pass());
 $("btn-mic").addEventListener("click", () => { if (listening) stopListening(); else { stopSpeaking(); startListening(); } });
-$("btn-repeat").addEventListener("click", () => { const it = game.items[game.idx]; if (it && !game.over) speak(questionSpeech(it)); });
+$("btn-repeat").addEventListener("click", () => { const it = game.items[game.idx]; if (it && !game.over) speakQuestion(it); });
 $("btn-pause").addEventListener("click", () => setPaused(true));
 $("btn-resume").addEventListener("click", () => { setPaused(false); if (!game.busy) showQuestion(); });
 $("btn-quit").addEventListener("click", () => {
