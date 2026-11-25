@@ -329,13 +329,30 @@ function handleVoice(alts) {
 /* ================= OYUN ================= */
 const game = { items: [], idx: 0, time: 0, total: 0, timerId: null, paused: false, over: true, cat: null, turn: 0, busy: false, level: "" };
 
+// Son oyunlarda sorulanları hatırla; her harfte önce görülmemiş sorulardan seç
+const SEEN_MAX = 1500;
+const qKey = (catId, q) => catId + "|" + q.l + "|" + q.a;
 function buildQuestions(cat) {
   const pools = cat.id === MIXED.id ? CATEGORIES : [cat];
-  return LETTERS.map((L) => {
-    const options = pools.flatMap((c) => c.questions.filter((q) => q.l === L).map((q) => ({ ...q, cat: c.name })));
-    const q = options[Math.floor(Math.random() * options.length)];
+  const seen = store.get("seen", []);
+  const seenSet = new Set(seen);
+  const items = LETTERS.map((L) => {
+    const options = pools.flatMap((c) => c.questions.filter((q) => q.l === L).map((q) => ({ ...q, cat: c.name, key: qKey(c.id, q) })));
+    if (!options.length) return null;
+    const fresh = options.filter((q) => !seenSet.has(q.key));
+    let pool = fresh;
+    if (!fresh.length) {
+      // Bu harfin bütün soruları görüldüyse en eskisinden başla
+      const order = (q) => seen.indexOf(q.key);
+      const oldest = Math.min(...options.map(order));
+      pool = options.filter((q) => order(q) === oldest);
+    }
+    const q = pool[Math.floor(Math.random() * pool.length)];
     return { letter: L, q, status: "pending", given: "" };
-  }).filter((it) => it.q);
+  }).filter(Boolean);
+  const used = new Set(items.map((it) => it.q.key));
+  store.set("seen", [...seen.filter((k) => !used.has(k)), ...used].slice(-SEEN_MAX));
+  return items;
 }
 
 function renderWheel() {

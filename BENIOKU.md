@@ -3,7 +3,8 @@
 Telefon ve tabletlerde tarayıcıdan oynanan, ana ekrana uygulama gibi eklenebilen harf çarkı oyunu.
 
 ## Özellikler
-- Kategoriler: Genel Kültür, Spor, Sinema, Tarih & Coğrafya, Karışık
+- 8 kategori + Karışık: Genel Kültür, Spor, Sinema, Tarih & Coğrafya, Bilim & Doğa, Müzik, Edebiyat, Mutfak
+- Her harfte 3 soru (toplam 672); oyun son oyunlarda sorulanları hatırlar, önce görülmemiş soruları getirir
 - Türk alfabesinin 28 harfi (Ğ hariç); "… ile başlar" ve "İçinde … olan" soruları
 - **Klavye ile** ya da **sesle** cevap (🎤 düğmesi; "pas" demek pas geçer)
 - Soruları sesli okuma, isteğe bağlı **eller serbest** modu (okuduktan sonra mikrofon kendisi açılır)
@@ -26,12 +27,12 @@ Mikrofon ancak **https** adresinde çalışır. En kolay yol:
 Sesli cevap Android'de Chrome'da, iPhone/iPad'de Safari'de çalışır. Firefox desteklemez (klavye ile oynanır).
 
 ## Soru ekleme
-`questions.js` dosyasında ilgili kategoriye satır ekleyin:
+`questions.js` ya da `questions-extra.js` dosyasında ilgili kategoriye satır ekleyin:
 ```js
 { l: "A", q: "Soru metni", a: "Doğru cevap", alt: ["Kabul edilen başka yazım"] },
 { l: "Ğ", c: true, q: "İçinde Ğ olan soru", a: "Dağ" },
 ```
-Aynı harfe birden çok soru yazarsanız oyun her seferinde rastgele birini seçer.
+Aynı harfe birden çok soru yazarsanız oyun her seferinde farklı birini seçer (yakın zamanda sorulanları atlar).
 Yeni kategori için `CATEGORIES` dizisine `{ id, name, icon, color, questions: [...] }` ekleyin.
 Dosyaları değiştirdikten sonra `sw.js` içindeki `VERSION` değerini artırın.
 
@@ -65,6 +66,6 @@ Sorular ElevenLabs ile önceden seslendirilip `audio/` klasörüne konabilir. Do
 $env:ELEVENLABS_API_KEY = "anahtarınız"   # elevenlabs.io → Developers → API Keys (Text to Speech izni yeterli)
 node tools/seslendir.mjs --dry            # kaç ses üretileceğini gösterir, kredi harcamaz
 node tools/seslendir.mjs --limit 3        # önce 3 tane dene
-node tools/seslendir.mjs                  # hepsini üret (224 soru ≈ 10.000 kredi)
+node tools/seslendir.mjs                  # hepsini üret (672 soru ≈ 31.000 kredi)
 ```
 Soru ekleyip değiştirdikten sonra komutu tekrar çalıştırın: yalnızca yeni/değişen sorular seslendirilir. Başka bir ses için `--voice <voice_id>`, ad için `--voice-name "Öykü"` ekleyin.
