@@ -350,3 +350,19 @@ button { cursor: pointer; border: 0; background: none; }
 .lb-note { text-align: center; color: var(--muted); font-size: 13px; margin: 14px 0 0; }
 .profile-sync { font-size: 13px; margin: 4px 0 0; color: var(--green); }
 .profile-sync.local { color: var(--yellow); }
+
+/* ---------- CEVAP YÖNTEMİ SEÇİMİ ---------- */
+.mode-card h2 { margin: 4px 0 14px; font-size: 1.25rem; }
+.mode-cat { font-size: .95rem; opacity: .8; }
+.mode-btn {
+  display: flex; align-items: center; gap: 14px; width: 100%; margin: 0 0 10px; padding: 14px 16px;
+  text-align: left; color: inherit; font: inherit; cursor: pointer;
+  background: rgba(255,255,255,.06); border: 2px solid var(--card-b); border-radius: 16px;
+}
+.mode-btn:hover, .mode-btn:focus-visible { border-color: var(--accent, #7c5cff); outline: none; }
+.mode-btn.last { border-color: var(--green); }
+.mode-btn b { display: block; font-size: 1.1rem; }
+.mode-btn small { display: block; opacity: .75; line-height: 1.35; margin-top: 2px; }
+.mode-btn[disabled] { opacity: .45; cursor: not-allowed; }
+.mode-ico { font-size: 2rem; }
+.mode-msg { min-height: 1.2em; margin: 4px 0; color: var(--yellow); font-size: .9rem; }

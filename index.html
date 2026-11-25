@@ -142,11 +142,6 @@
         <input type="range" id="opt-rate" min="0.75" max="1.25" step="0.05" value="0.95" />
       </label>
       <p id="voice-tip" class="voice-tip"></p>
-      <label class="setting toggle">
-        <span>Eller serbest <small>(okuduktan sonra mikrofonu kendisi açar)</small></span>
-        <input type="checkbox" id="opt-handsfree" />
-        <i></i>
-      </label>
     </div>
 
     <button id="btn-howto" class="link-btn">Nasıl oynanır?</button>
@@ -226,13 +221,31 @@
     <ul id="result-list" class="result-list"></ul>
   </section>
 
+  <!-- CEVAP YÖNTEMİ SEÇİMİ -->
+  <div id="mode-pick" class="overlay hidden" role="dialog" aria-labelledby="mode-title">
+    <div class="overlay-card mode-card">
+      <div id="mode-cat" class="mode-cat"></div>
+      <h2 id="mode-title">Nasıl cevaplamak istersin?</h2>
+      <button id="mode-voice" class="mode-btn" type="button">
+        <span class="mode-ico">🎤</span>
+        <span><b>Sesle</b><small>Soru bitince mikrofon kendiliğinden açılır, cevabını söylersin. “Pas” demen yeterli.</small></span>
+      </button>
+      <button id="mode-keyboard" class="mode-btn" type="button">
+        <span class="mode-ico">⌨️</span>
+        <span><b>Klavyeyle</b><small>Cevabını yazıp CEVAPLA'ya basarsın.</small></span>
+      </button>
+      <p id="mode-msg" class="mode-msg"></p>
+      <button id="mode-cancel" class="link-btn" type="button">Vazgeç</button>
+    </div>
+  </div>
+
   <!-- NASIL OYNANIR -->
   <div id="howto" class="overlay hidden">
     <div class="overlay-card howto">
       <h2>Nasıl oynanır?</h2>
       <ul>
         <li>Çarkta Türk alfabesinin her harfi için bir soru var. Önce soru okunur, sonra harf söylenir: cevap o harfle <b>başlar</b> ya da “içinde … var” denirse o harfi <b>içerir</b>.</li>
-        <li>Cevabını yazıp <b>CEVAPLA</b>'ya bas ya da 🎤 düğmesine dokunup <b>söyle</b>.</li>
+        <li>Oyuna girerken <b>Sesle</b> ya da <b>Klavyeyle</b> oynamayı seçersin. Sesle oynarken soru bitince mikrofon kendiliğinden açılır; cevabını söylemen yeterli.</li>
         <li>Bilmiyorsan <b>PAS</b> de: o harf sarı olur, tur sonunda tekrar sana gelir. Sesli oynarken “pas” demen yeterli.</li>
         <li>Süre bitmeden bütün harfleri tamamlamaya çalış. Yeşil = doğru, kırmızı = yanlış.</li>
         <li>Küçük yazım hataları ve Türkçe karakter eksikleri (ş→s, ı→i…) tolere edilir.</li>

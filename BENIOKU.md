@@ -7,7 +7,7 @@ Telefon ve tabletlerde tarayıcıdan oynanan, ana ekrana uygulama gibi eklenebil
 - Her harfte 3 soru (toplam 672); oyun son oyunlarda sorulanları hatırlar, önce görülmemiş soruları getirir
 - Türk alfabesinin 28 harfi (Ğ hariç); "… ile başlar" ve "İçinde … olan" soruları
 - **Klavye ile** ya da **sesle** cevap (🎤 düğmesi; "pas" demek pas geçer)
-- Soruları sesli okuma, isteğe bağlı **eller serbest** modu (okuduktan sonra mikrofon kendisi açılır)
+- Oyuna girerken **Sesle** ya da **Klavyeyle** seçimi; sesle oynarken soru bitince mikrofon kendiliğinden açılır
 - Süre seçimi, duraklatma, kategori rekorları, sonuç ekranında doğru cevaplar
 - Yazım hatası ve Türkçe karakter toleransı (fenerbahce = Fenerbahçe)
 - Çevrimdışı çalışma (PWA)

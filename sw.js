@@ -1,5 +1,5 @@
 // Çevrimdışı çalışma için basit önbellek. Dosyaları güncellediğinizde VERSION'ı artırın.
-const VERSION = "harfcarki-v8";
+const VERSION = "harfcarki-v9";
 const FILES = ["./", "./index.html", "./style.css", "./app.js", "./questions.js", "./speech-text.js", "./questions-extra.js", "./auth.js", "./firebase-config.js", "./manifest.json", "./icon.svg"];
 
 self.addEventListener("install", (e) => {

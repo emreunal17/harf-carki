@@ -288,9 +288,13 @@ function speakQuestion(it, onEnd) {
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let rec = null, listening = false;
 
-function startListening() {
+let listenRetries = 0; // sesle modda sessiz kalınca kaç kez yeniden dinlendi
+function startListening(auto) {
   if (!SR || listening || game.paused || game.over || game.busy) return;
+  if (!auto) listenRetries = 0;
   rec = new SR();
+  const myRec = rec;
+  let gotResult = false;
   rec.lang = "tr-TR";
   rec.interimResults = true;
   rec.maxAlternatives = 5;
@@ -304,19 +308,28 @@ function startListening() {
     if (!res.isFinal || token !== game.turn) return;
     const alts = Array.from(res).map((a) => a.transcript.trim()).filter(Boolean);
     $("heard").textContent = "Duyulan: “" + alts[0] + "”";
+    gotResult = true;
     stopListening();
     handleVoice(alts);
   };
   rec.onerror = (e) => {
-    if (e.error === "not-allowed" || e.error === "service-not-allowed") $("heard").textContent = "Mikrofon izni verilmedi. Tarayıcı ayarlarından izin verin.";
+    if (e.error === "not-allowed" || e.error === "service-not-allowed") { listenRetries = 99; $("heard").textContent = "Mikrofon izni verilmedi. Tarayıcı ayarlarından izin verin."; }
     else if (e.error === "no-speech") $("heard").textContent = "Ses algılanamadı. 🎤 ile tekrar dene.";
     else if (e.error !== "aborted") $("heard").textContent = "Ses tanıma hatası: " + e.error;
   };
-  rec.onend = () => { listening = false; $("btn-mic").classList.remove("listening"); };
+  rec.onend = () => {
+    if (rec !== myRec) return; // yerine yenisi başlatıldı
+    listening = false; $("btn-mic").classList.remove("listening");
+    // Sesle oynarken cevap gelmeden kapandıysa (sessizlik) birkaç kez kendiliğinden yeniden dinle
+    if (!gotResult && !myRec.stopped && game.mode === "voice" && token === game.turn && !game.busy && !game.paused && !game.over) {
+      if (listenRetries < 3) { listenRetries++; setTimeout(() => { if (token === game.turn) startListening(true); }, 250); }
+      else $("heard").textContent = "Seni duyamadım. Konuşmak için 🎤 düğmesine dokun.";
+    }
+  };
   try { rec.start(); } catch {}
 }
 function stopListening() {
-  if (rec) { try { rec.abort(); } catch {} }
+  if (rec) { rec.stopped = true; try { rec.abort(); } catch {} }
   listening = false;
   $("btn-mic").classList.remove("listening");
 }
@@ -327,7 +340,7 @@ function handleVoice(alts) {
 }
 
 /* ================= OYUN ================= */
-const game = { items: [], idx: 0, time: 0, total: 0, timerId: null, paused: false, over: true, cat: null, turn: 0, busy: false, level: "" };
+const game = { items: [], idx: 0, time: 0, total: 0, timerId: null, paused: false, over: true, cat: null, turn: 0, busy: false, level: "", mode: "keyboard" };
 
 // Son oyunlarda sorulanları hatırla; her harfte önce görülmemiş sorulardan seç
 const SEEN_MAX = 1500;
@@ -429,8 +442,9 @@ function showQuestion() {
   $("heard").textContent = "";
   paintBubbles();
   const token = game.turn;
+  if (game.mode === "keyboard") setTimeout(() => { if (token === game.turn) $("answer").focus({ preventScroll: true }); }, 50);
   speakQuestion(it, () => {
-    if ($("opt-handsfree").checked && token === game.turn && !game.paused && !game.over) startListening();
+    if (game.mode === "voice" && token === game.turn && !game.paused && !game.over) startListening();
   });
 }
 
@@ -561,10 +575,50 @@ function renderMenu() {
     const best = p.best[cat.id] || 0;
     btn.innerHTML = '<span class="ico">' + cat.icon + '</span><span><div class="name">' + escapeHtml(cat.name) +
       '</div><div class="best">' + (best ? "Rekor: " + best + "/" + LETTERS.length : "Henüz oynanmadı") + "</div></span>";
-    btn.onclick = () => startGame(cat);
+    btn.onclick = () => askMode(cat);
     grid.appendChild(btn);
   });
 }
+
+/* ---------- Oyundan önce: sesle mi klavyeyle mi? ---------- */
+let modeCat = null;
+const voiceSupported = () => !!SR && window.isSecureContext;
+function askMode(cat) {
+  modeCat = cat;
+  $("mode-cat").textContent = cat.icon + " " + cat.name;
+  $("mode-msg").textContent = voiceSupported() ? "" : "Bu tarayıcıda sesle cevap verilemiyor. Android'de Chrome, iPhone/iPad'de Safari kullan.";
+  $("mode-voice").disabled = !voiceSupported();
+  const last = store.get("answer-mode", "voice");
+  $("mode-voice").classList.toggle("last", last === "voice" && voiceSupported());
+  $("mode-keyboard").classList.toggle("last", last !== "voice" || !voiceSupported());
+  $("mode-pick").classList.remove("hidden");
+  ($("mode-voice").classList.contains("last") ? $("mode-voice") : $("mode-keyboard")).focus({ preventScroll: true });
+}
+function closeMode() { $("mode-pick").classList.add("hidden"); }
+async function chooseMode(mode) {
+  if (!modeCat) return;
+  if (mode === "voice") {
+    // Mikrofon iznini şimdi (dokunuşla) iste; oyun sırasında otomatik açılabilsin
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        const st = await navigator.mediaDevices.getUserMedia({ audio: true });
+        st.getTracks().forEach((t) => t.stop());
+      } catch (e) {
+        $("mode-msg").textContent = "Mikrofon izni verilmedi. Tarayıcı ayarlarından izin ver ya da Klavyeyle oyna.";
+        return;
+      }
+    }
+  }
+  store.set("answer-mode", mode);
+  game.mode = mode;
+  closeMode();
+  startGame(modeCat);
+}
+$("mode-voice").addEventListener("click", () => chooseMode("voice"));
+$("mode-keyboard").addEventListener("click", () => chooseMode("keyboard"));
+$("mode-cancel").addEventListener("click", closeMode);
+$("mode-pick").addEventListener("click", (e) => { if (e.target === $("mode-pick")) closeMode(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("mode-pick").classList.contains("hidden")) closeMode(); });
 
 /* ---------- Profil ekranı ---------- */
 let pendingAvatar = null;
@@ -716,7 +770,7 @@ async function loadLeaderboard() {
 /* ---------- Ayarlar ---------- */
 function rateLabel(v) { v = parseFloat(v); return v < 0.88 ? "Yavaş" : v > 1.08 ? "Hızlı" : "Normal"; }
 function initSettings() {
-  ["opt-time", "opt-tts", "opt-handsfree", "opt-rate"].forEach((id) => {
+  ["opt-time", "opt-tts", "opt-rate"].forEach((id) => {
     const el = $(id);
     const saved = store.get(id, null);
     if (saved !== null) el.type === "checkbox" ? (el.checked = saved) : (el.value = saved);
@@ -731,7 +785,6 @@ function initSettings() {
 
   if (!SR) {
     $("btn-mic").classList.add("hidden");
-    $("opt-handsfree").closest(".setting").classList.add("hidden");
     const w = $("voice-warning");
     w.textContent = "Bu tarayıcı sesli cevabı desteklemiyor. Sesli oynamak için Android'de Chrome, iPhone/iPad'de Safari kullanın.";
     w.classList.remove("hidden");
@@ -762,7 +815,7 @@ $("btn-quit").addEventListener("click", () => {
   game.over = true; clearInterval(game.timerId); stopListening(); stopSpeaking();
   showScreen("menu");
 });
-$("btn-again").addEventListener("click", () => startGame(game.cat));
+$("btn-again").addEventListener("click", () => askMode(game.cat));
 $("btn-menu").addEventListener("click", () => showScreen("menu"));
 $("btn-howto").addEventListener("click", () => $("howto").classList.remove("hidden"));
 $("btn-howto-close").addEventListener("click", () => $("howto").classList.add("hidden"));
