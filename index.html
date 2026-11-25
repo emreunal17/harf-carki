@@ -181,6 +181,7 @@
 
       <div class="panel">
         <p id="question" class="question"></p>
+        <div id="choices" class="choices" role="group" aria-label="Şıklar"></div>
         <div id="feedback" class="feedback" aria-live="polite"></div>
 
         <form id="answer-form" class="answer-form" autocomplete="off">
@@ -234,6 +235,10 @@
     <div class="overlay-card mode-card">
       <div id="mode-cat" class="mode-cat"></div>
       <h2 id="mode-title">Nasıl cevaplamak istersin?</h2>
+      <button id="mode-choice" class="mode-btn" type="button">
+        <span class="mode-ico">🔤</span>
+        <span><b>Şıklı</b><small>Her soruda 3 şık çıkar, doğru olana dokunursun. En kolayı! Rekorları ayrı tutulur.</small></span>
+      </button>
       <button id="mode-voice" class="mode-btn" type="button">
         <span class="mode-ico">🎤</span>
         <span><b>Sesle</b><small>Soru bitince mikrofon kendiliğinden açılır, cevabını söylersin. “Pas” demen yeterli.</small></span>
@@ -253,7 +258,7 @@
       <h2>Nasıl oynanır?</h2>
       <ul>
         <li>Çarkta Türk alfabesinin her harfi için bir soru var. Önce soru okunur, sonra harf söylenir: cevap o harfle <b>başlar</b> ya da “içinde … var” denirse o harfi <b>içerir</b>.</li>
-        <li>Oyuna girerken <b>Sesle</b> ya da <b>Klavyeyle</b> oynamayı seçersin. Sesle oynarken soru bitince mikrofon kendiliğinden açılır; cevabını söylemen yeterli.</li>
+        <li>Oyuna girerken <b>Şıklı</b>, <b>Sesle</b> ya da <b>Klavyeyle</b> oynamayı seçersin. Şıklıda 3 şıktan doğrusuna dokunursun; şıklı rekorlar ayrı tutulur ve liderlik tablosuna girmez. Sesle oynarken soru bitince mikrofon kendiliğinden açılır; cevabını söylemen yeterli.</li>
         <li>Bilmiyorsan <b>PAS</b> de: o harf mavi olur, tur sonunda tekrar sana gelir. Sesli oynarken “pas” demen yeterli.</li>
         <li>Süre bitmeden bütün harfleri tamamlamaya çalış. Yeşil = doğru, kırmızı = yanlış, mavi = pas.</li>
         <li>Küçük yazım hataları ve Türkçe karakter eksikleri (ş→s, ı→i…) tolere edilir.</li>

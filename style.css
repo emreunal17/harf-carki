@@ -616,3 +616,33 @@ button { cursor: pointer; border: 0; background: none; }
 
 /* Tabela yazı tipi yalnız büyük harf çiziyor: Türkçe büyük harfe çevir (i → İ) */
 .brand h1, .lb-btn, .overlay-card h2, .result-head h2, .btn, .question .rule { text-transform: uppercase; }
+
+/* ---------- ŞIKLI MOD ---------- */
+.panel[data-mode="choice"] .answer-form,
+.panel[data-mode="choice"] .heard,
+.panel[data-mode="choice"] #btn-submit { display: none; }
+.choices { display: grid; gap: 10px; margin: 4px 0 6px; }
+.choices:empty { display: none; }
+.choice {
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 14px;
+  text-align: left; font-size: clamp(16px, 4.4vw, 19px); font-weight: 700; color: var(--text);
+  background: var(--stage-2); border: 2px solid var(--line); border-radius: 14px;
+  box-shadow: 0 4px 0 #070914;
+  transition: transform .12s var(--ease-out), border-color .15s, background .2s, opacity .2s;
+  animation: card-in .4s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 70ms + 120ms);
+}
+.choice:hover:not([disabled]), .choice:focus-visible { border-color: var(--amber); outline: none; transform: translateY(-2px); }
+.choice:active:not([disabled]) { transform: translateY(3px); box-shadow: 0 1px 0 #070914; }
+.choice[disabled] { cursor: default; }
+.choice-key {
+  flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+  font-family: var(--display); font-size: 15px; color: #2a1800;
+  background: radial-gradient(circle at 40% 32%, var(--amber-hot), var(--amber) 60%, var(--amber-deep));
+}
+.choice-text { flex: 1; }
+.choice.right { border-color: var(--green); background: color-mix(in srgb, var(--green) 18%, var(--stage-2)); animation: pop .5s var(--ease-out); }
+.choice.right .choice-key { background: var(--green); color: #04261a; }
+.choice.wrong { border-color: var(--red); background: color-mix(in srgb, var(--red) 18%, var(--stage-2)); animation: wobble .45s; }
+.choice.wrong .choice-key { background: var(--red); color: #fff; }
+.choice.dim { opacity: .4; }
+.panel[data-mode="choice"] .actions { margin-top: 8px; }

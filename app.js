@@ -15,7 +15,7 @@ function profileKey() { return "profile." + (Auth.user ? Auth.user.uid : "none")
 function getProfile() {
   const u = Auth.user || { name: "Oyuncu" };
   const p = store.get(profileKey(), null) || {};
-  return { name: p.name || u.name || "Oyuncu", avatar: p.avatar || "🙂", games: p.games || 0, correct: p.correct || 0, answered: p.answered || 0, best: p.best || {} };
+  return { name: p.name || u.name || "Oyuncu", avatar: p.avatar || "🙂", games: p.games || 0, correct: p.correct || 0, answered: p.answered || 0, best: p.best || {}, sik: p.sik || { games: 0, correct: 0, answered: 0, best: {} } };
 }
 function saveProfile(p) { store.set(profileKey(), p); }
 
@@ -51,6 +51,7 @@ const Cloud = {
         const best = { ...(c.best || {}) };
         Object.entries(local.best).forEach(([k, v]) => { best[k] = Math.max(best[k] || 0, v); });
         merged = {
+          sik: local.sik,
           name: c.name || local.name,
           avatar: c.avatar || local.avatar,
           games: useCloud ? c.games : local.games,
@@ -350,7 +351,7 @@ function buildQuestions(cat) {
   const seen = store.get("seen", []);
   const seenSet = new Set(seen);
   const items = LETTERS.map((L) => {
-    const options = pools.flatMap((c) => c.questions.filter((q) => q.l === L).map((q) => ({ ...q, cat: c.name, key: qKey(c.id, q) })));
+    const options = pools.flatMap((c) => c.questions.filter((q) => q.l === L).map((q) => ({ ...q, cat: c.name, catId: c.id, key: qKey(c.id, q) })));
     if (!options.length) return null;
     const fresh = options.filter((q) => !seenSet.has(q.key));
     let pool = fresh;
@@ -366,6 +367,77 @@ function buildQuestions(cat) {
   const used = new Set(items.map((it) => it.q.key));
   store.set("seen", [...seen.filter((k) => !used.has(k)), ...used].slice(-SEEN_MAX));
   return items;
+}
+
+/* ---------- Şıklar: doğru cevap + aynı harf kuralına uyan 2 yanlış ---------- */
+function fitsRule(ans, letter, contains) {
+  const a = lower(ans), l = lower(letter);
+  return contains ? a.includes(l) : a.startsWith(l);
+}
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+  return arr;
+}
+function buildChoices(it) {
+  const q = it.q, contains = !!q.c;
+  const taken = new Set([q.a, ...(q.alt || [])].map(fold));
+  const pick = (cats) => {
+    const out = [];
+    cats.forEach((c) => c.questions.forEach((o) => {
+      if (o.l !== it.letter || !!o.c !== contains) return;
+      const f = fold(o.a);
+      if (taken.has(f) || !fitsRule(o.a, it.letter, contains) || out.some((x) => fold(x) === f)) return;
+      out.push(o.a);
+    }));
+    return shuffle(out);
+  };
+  // Önce aynı kategoriden, yetmezse diğerlerinden
+  let wrong = pick(CATEGORIES.filter((c) => c.id === q.catId)).slice(0, 2);
+  if (wrong.length < 2) {
+    wrong.forEach((w) => taken.add(fold(w)));
+    wrong = wrong.concat(pick(CATEGORIES.filter((c) => c.id !== q.catId)).slice(0, 2 - wrong.length));
+  }
+  if (wrong.length < 2) {
+    // "İçinde … var" sorularında: harfi içeren herhangi bir cevap
+    wrong.forEach((w) => taken.add(fold(w)));
+    const any = [];
+    CATEGORIES.forEach((c) => c.questions.forEach((o) => {
+      const f = fold(o.a);
+      if (!taken.has(f) && fitsRule(o.a, it.letter, true) && !any.some((x) => fold(x) === f)) any.push(o.a);
+    }));
+    wrong = wrong.concat(shuffle(any).slice(0, 2 - wrong.length));
+  }
+  return shuffle([q.a, ...wrong]);
+}
+function renderChoices(it) {
+  const box = $("choices");
+  box.innerHTML = "";
+  if (game.mode !== "choice") return;
+  if (!it.choices) it.choices = buildChoices(it);
+  it.choices.forEach((text, i) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "choice";
+    b.style.setProperty("--i", i);
+    const k = document.createElement("span"); k.className = "choice-key"; k.textContent = "ABC"[i];
+    const t = document.createElement("span"); t.className = "choice-text"; t.textContent = text;
+    b.append(k, t);
+    b.onclick = () => pickChoice(i);
+    box.appendChild(b);
+  });
+}
+function pickChoice(i) {
+  if (game.mode !== "choice" || game.over || game.paused || game.busy) return;
+  const it = game.items[game.idx];
+  const btns = [...$("choices").children];
+  if (!btns[i]) return;
+  btns.forEach((b, k) => {
+    b.disabled = true;
+    if (it.choices[k] === it.q.a) b.classList.add("right");
+    else if (k === i) b.classList.add("wrong");
+    else b.classList.add("dim");
+  });
+  submit(it.choices[i]);
 }
 
 function renderWheel() {
@@ -471,7 +543,8 @@ function startGame(cat) {
   game.paused = false;
   game.over = false;
   game.busy = false;
-  $("game-category").innerHTML = escapeHtml(cat.icon + " " + cat.name) + '<span class="level-badge">' + escapeHtml(game.level) + "</span>";
+  $("game-category").innerHTML = escapeHtml(cat.icon + " " + cat.name) + '<span class="level-badge">' + escapeHtml(game.level + (game.mode === "choice" ? " · Şıklı" : "")) + "</span>";
+  document.querySelector(".panel").dataset.mode = game.mode;
   flash("", "");
   $("pause-overlay").classList.add("hidden");
   renderWheel();
@@ -512,6 +585,7 @@ function showQuestion() {
     (game.cat.id === MIXED.id ? " · " + it.q.cat : "")) + "</span>" + it.q.q.split(/\s+/).map((w, i) => '<span class="w" style="--i:' + i + '">' + escapeHtml(w) + "</span>").join(" ");
   $("answer").value = "";
   $("heard").textContent = "";
+  renderChoices(it);
   paintBubbles();
   const token = game.turn;
   if (game.mode === "keyboard") setTimeout(() => { if (token === game.turn) $("answer").focus({ preventScroll: true }); }, 50);
@@ -605,17 +679,20 @@ function endGame(title) {
   $("res-best").classList.remove("record");
 
   const p = getProfile();
-  p.games += 1; p.correct += c; p.answered += game.items.length;
-  const best = p.best[game.cat.id] || 0;
+  const sik = game.mode === "choice";
+  const st = sik ? p.sik : p;
+  st.games += 1; st.correct += c; st.answered += game.items.length;
+  const tag = sik ? " · Şıklı" : "";
+  const best = st.best[game.cat.id] || 0;
   if (c > best) {
-    p.best[game.cat.id] = c;
-    $("res-best").textContent = "🎉 Yeni rekor! (" + game.cat.name + " · " + game.level + ")";
+    st.best[game.cat.id] = c;
+    $("res-best").textContent = "🎉 Yeni rekor! (" + game.cat.name + " · " + game.level + tag + ")";
     $("res-best").classList.add("record");
     setTimeout(() => confetti(c === game.items.length ? 140 : 70), 400);
   }
-  else $("res-best").textContent = "Rekorun: " + best + " doğru (" + game.cat.name + ") · Seviye: " + game.level;
+  else $("res-best").textContent = "Rekorun: " + best + " doğru (" + game.cat.name + tag + ") · Seviye: " + game.level;
   saveProfile(p);
-  Cloud.push(p);
+  if (!sik) Cloud.push(p);
 
   $("result-list").innerHTML = game.items.map((it, i) =>
     '<li class="' + it.status + '" style="--i:' + i + '"><div class="rl">' + it.letter + "</div><div>" +
@@ -651,8 +728,10 @@ function renderMenu() {
     btn.style.setProperty("--c", cat.color);
     btn.style.setProperty("--i", i);
     const best = p.best[cat.id] || 0;
+    const sb = p.sik.best[cat.id] || 0;
+    const recs = [best ? "Rekor: " + best + "/" + LETTERS.length : "", sb ? "Şıklı: " + sb : ""].filter(Boolean).join(" · ");
     btn.innerHTML = '<span class="ico">' + cat.icon + '</span><span><div class="name">' + escapeHtml(cat.name) +
-      '</div><div class="best">' + (best ? "Rekor: " + best + "/" + LETTERS.length : "Henüz oynanmadı") + "</div>" +
+      '</div><div class="best">' + (recs || "Henüz oynanmadı") + "</div>" +
       '<div class="bar"><i style="--w:' + Math.round((100 * best) / LETTERS.length) + '%"></i></div></span>';
     btn.onclick = () => askMode(cat);
     grid.appendChild(btn);
@@ -667,11 +746,11 @@ function askMode(cat) {
   $("mode-cat").textContent = cat.icon + " " + cat.name;
   $("mode-msg").textContent = voiceSupported() ? "" : "Bu tarayıcıda sesle cevap verilemiyor. Android'de Chrome, iPhone/iPad'de Safari kullan.";
   $("mode-voice").disabled = !voiceSupported();
-  const last = store.get("answer-mode", "voice");
-  $("mode-voice").classList.toggle("last", last === "voice" && voiceSupported());
-  $("mode-keyboard").classList.toggle("last", last !== "voice" || !voiceSupported());
+  let last = store.get("answer-mode", "choice");
+  if (last === "voice" && !voiceSupported()) last = "choice";
+  ["choice", "voice", "keyboard"].forEach((m) => $("mode-" + m).classList.toggle("last", m === last));
   $("mode-pick").classList.remove("hidden");
-  ($("mode-voice").classList.contains("last") ? $("mode-voice") : $("mode-keyboard")).focus({ preventScroll: true });
+  $("mode-" + last).focus({ preventScroll: true });
 }
 function closeMode() { $("mode-pick").classList.add("hidden"); }
 async function chooseMode(mode) {
@@ -693,11 +772,19 @@ async function chooseMode(mode) {
   closeMode();
   startGame(modeCat);
 }
+$("mode-choice").addEventListener("click", () => chooseMode("choice"));
 $("mode-voice").addEventListener("click", () => chooseMode("voice"));
 $("mode-keyboard").addEventListener("click", () => chooseMode("keyboard"));
 $("mode-cancel").addEventListener("click", closeMode);
 $("mode-pick").addEventListener("click", (e) => { if (e.target === $("mode-pick")) closeMode(); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("mode-pick").classList.contains("hidden")) closeMode(); });
+// Şıklı modda klavyeden A/B/C ya da 1/2/3
+document.addEventListener("keydown", (e) => {
+  if (game.mode !== "choice" || game.over || game.paused || !$("mode-pick").classList.contains("hidden")) return;
+  if (!$("screen-game").classList.contains("active") || e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = { a: 0, b: 1, c: 2, "1": 0, "2": 1, "3": 2 }[e.key.toLowerCase()];
+  if (k !== undefined) { e.preventDefault(); pickChoice(k); }
+});
 
 /* ---------- Profil ekranı ---------- */
 let pendingAvatar = null;
@@ -733,7 +820,9 @@ function openProfile() {
   $("st-correct").textContent = p.correct;
   $("st-rate").textContent = "%" + (p.answered ? Math.round((p.correct / p.answered) * 100) : 0);
   const rows = [...CATEGORIES, MIXED].filter((c) => p.best[c.id]).map((c) =>
-    "<li><span>" + c.icon + " " + escapeHtml(c.name) + "</span><b>" + p.best[c.id] + "/" + LETTERS.length + "</b></li>");
+    "<li><span>" + c.icon + " " + escapeHtml(c.name) + "</span><b>" + p.best[c.id] + "/" + LETTERS.length + "</b></li>").concat(
+    [...CATEGORIES, MIXED].filter((c) => p.sik.best[c.id]).map((c) =>
+    "<li><span>" + c.icon + " " + escapeHtml(c.name) + " · Şıklı</span><b>" + p.sik.best[c.id] + "/" + LETTERS.length + "</b></li>"));
   $("st-best").innerHTML = rows.length ? rows.join("") : '<li><span>Henüz rekor yok. Hadi bir oyun oyna!</span></li>';
   showScreen("profile");
 }
