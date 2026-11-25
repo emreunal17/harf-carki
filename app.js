@@ -1255,9 +1255,14 @@ $("btn-howto-close").addEventListener("click", () => $("howto").classList.add("h
 document.addEventListener("visibilitychange", () => { if (document.hidden && !game.over && !game.paused && !game.online) setPaused(true); });
 
 // Liderlik
-$("btn-leaderboard").addEventListener("click", () => openLeaderboard());
-$("btn-result-lb").addEventListener("click", () => openLeaderboard(game.cat ? game.cat.id : "toplam"));
-$("btn-lb-back").addEventListener("click", () => showScreen("menu"));
+let lbFrom = "menu"; // liderlikten geri dönülecek ekran (sonuçtan gelindiyse cevap listesine dön)
+$("btn-leaderboard").addEventListener("click", () => { lbFrom = "menu"; openLeaderboard(); });
+$("btn-result-lb").addEventListener("click", () => {
+  lbFrom = "result";
+  const id = game.cat && lbTabs().some((t) => t.id === game.cat.id) ? game.cat.id : "hafta"; // günün çarkının ayrı tablosu yok
+  openLeaderboard(id);
+});
+$("btn-lb-back").addEventListener("click", () => showScreen(lbFrom));
 $("btn-lb-refresh").addEventListener("click", loadLeaderboard);
 
 // Profil
