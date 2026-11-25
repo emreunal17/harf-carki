@@ -38,7 +38,7 @@ let KEY = process.env.ELEVENLABS_API_KEY;
 
 // Oyunun kendi dosyalarını yükle (aynı metin fonksiyonları)
 const ctx = vm.createContext({ module: undefined });
-for (const f of ["speech-text.js", "questions.js", "questions-extra.js"]) {
+for (const f of ["speech-text.js", "questions.js", "questions-extra.js", "questions-bank.js"]) {
   vm.runInContext(fs.readFileSync(path.join(ROOT, f), "utf8"), ctx, { filename: f });
 }
 vm.runInContext("this.__x = { CATEGORIES, clipText };", ctx);

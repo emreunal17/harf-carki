@@ -281,6 +281,8 @@ function speak(parts, onEnd, clipKey) {
   if (!$("opt-tts").checked) { done(); return; }
   const rate = parseFloat($("opt-rate").value) || 0.95;
   const file = useStudio() && clipKey && studio.clips[clipKey];
+  // Stüdyo sesi seçiliyken kaydı olmayan soruda cihazın başka (çoğu zaman kadın) sesine geçme
+  if (useStudio() && clipKey && !file) { done(); return; }
   if (file) {
     const myId = ++speakId;
     if (synth) synth.cancel();
@@ -288,7 +290,7 @@ function speak(parts, onEnd, clipKey) {
     const a = new Audio("audio/" + file);
     liveAudio = a;
     a.playbackRate = Math.min(1.3, Math.max(0.75, rate / 0.95));
-    const fallback = () => { if (myId === speakId) { liveAudio = null; speakDevice(parts, done); } };
+    const fallback = () => { if (myId === speakId) { liveAudio = null; done(); } };
     a.onended = () => { if (myId === speakId) done(); };
     a.onerror = fallback;
     const p = a.play();
