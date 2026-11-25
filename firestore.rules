@@ -21,8 +21,14 @@ service cloud.firestore {
         && bestValue(b, 'edebiyat') && bestValue(b, 'mutfak') && bestValue(b, 'karisik');
     }
 
+    // Profil fotoğrafı: isteğe bağlı, küçültülmüş JPEG (data URL)
+    function photoOk(d) {
+      return !('photo' in d) || (d.photo is string && d.photo.size() < 60000 && d.photo.matches('data:image/jpeg;base64,[A-Za-z0-9+/=]+'));
+    }
+
     function valid(d) {
-      return d.keys().hasOnly(['name', 'avatar', 'games', 'correct', 'answered', 'best', 'updatedAt'])
+      return d.keys().hasOnly(['name', 'avatar', 'games', 'correct', 'answered', 'best', 'photo', 'updatedAt'])
+        && photoOk(d)
         && d.keys().hasAll(['name', 'avatar', 'games', 'correct', 'answered', 'best', 'updatedAt'])
         && d.name is string && d.name.size() >= 1 && d.name.size() <= 20
         && d.avatar is string && d.avatar.size() >= 1 && d.avatar.size() <= 16
@@ -43,6 +49,45 @@ service cloud.firestore {
         && request.resource.data.games <= resource.data.games + 5
         && request.resource.data.answered - resource.data.answered <= 5 * 28;
       allow delete: if isOwner(uid);
+    }
+
+    // ONLINE ODALAR: rooms/{KOD} — kodu bilen giriş yapmış herkes görebilir, yalnızca kurucu değiştirir
+    function roomOk(d) {
+      return d.keys().hasOnly(['host', 'hostName', 'cat', 'total', 'mode', 'status', 'round', 'items', 'createdAt', 'startAt'])
+        && d.host is string && d.hostName is string && d.hostName.size() <= 20
+        && d.cat is string && d.cat.size() <= 20
+        && d.total is int && d.total >= 0 && d.total <= 600
+        && d.mode in ['choice', 'free']
+        && d.status in ['lobby', 'playing', 'closed']
+        && d.round is int && d.round >= 0
+        && d.items is list && d.items.size() <= 29;
+    }
+    function playerOk(d) {
+      return d.keys().hasOnly(['name', 'avatar', 'photo', 'correct', 'wrong', 'answered', 'done', 'time', 'round', 'updatedAt'])
+        && d.name is string && d.name.size() >= 1 && d.name.size() <= 20
+        && d.avatar is string && d.avatar.size() <= 16
+        && photoOk(d)
+        && d.correct is int && d.correct >= 0 && d.correct <= 29
+        && d.wrong is int && d.wrong >= 0 && d.wrong <= 29
+        && d.answered is int && d.answered >= 0 && d.answered <= 29
+        && d.done is bool && d.time is int && d.time >= 0 && d.round is int;
+    }
+
+    match /rooms/{code} {
+      allow get: if request.auth != null;
+      allow create: if request.auth != null && code.size() == 5
+        && request.resource.data.host == request.auth.uid && roomOk(request.resource.data);
+      allow update: if request.auth != null && resource.data.host == request.auth.uid
+        && request.resource.data.host == resource.data.host && roomOk(request.resource.data);
+      allow delete: if request.auth != null && resource.data.host == request.auth.uid;
+
+      match /players/{uid} {
+        allow read: if request.auth != null;
+        allow create, update: if isOwner(uid) && playerOk(request.resource.data)
+          && exists(/databases/$(database)/documents/rooms/$(code));
+        allow delete: if isOwner(uid)
+          || (request.auth != null && get(/databases/$(database)/documents/rooms/$(code)).data.host == request.auth.uid);
+      }
     }
   }
 }

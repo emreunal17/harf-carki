@@ -20,7 +20,7 @@
   <!-- GİRİŞ / HESAP AÇ -->
   <section id="screen-login" class="screen active">
     <header class="brand">
-      <div class="brand-logo" aria-hidden="true"><span>A</span><span>B</span><span>C</span></div>
+      <div class="logo-wheel" aria-hidden="true"></div>
       <h1>Harf Çarkı</h1>
       <p class="tagline">Giriş yap ya da hesap aç, rekorların seninle kalsın.</p>
     </header>
@@ -64,13 +64,19 @@
     </div>
 
     <div class="profile-head">
-      <div id="profile-avatar" class="profile-avatar">🙂</div>
+      <button id="profile-avatar" class="profile-avatar" type="button" aria-label="Profil fotoğrafını değiştir">🙂</button>
+      <div class="photo-ctl">
+        <button id="btn-photo" class="chip-btn" type="button">📷 Fotoğraf ekle</button>
+        <button id="btn-photo-remove" class="link-btn small hidden" type="button">Fotoğrafı kaldır</button>
+        <input id="photo-input" type="file" accept="image/*" hidden />
+      </div>
+      <p id="photo-msg" class="photo-msg" aria-live="polite"></p>
       <input id="profile-name" class="profile-name" type="text" maxlength="20" placeholder="Adın" />
       <p id="profile-account" class="profile-account"></p>
       <p id="profile-sync" class="profile-sync"></p>
     </div>
 
-    <h3 class="section-title">Avatar seç</h3>
+    <h3 class="section-title">Ya da avatar seç</h3>
     <div id="avatar-grid" class="avatar-grid"></div>
 
     <h3 class="section-title">İstatistikler</h3>
@@ -104,14 +110,15 @@
       <span id="chip-avatar" class="chip-avatar">🙂</span><span id="chip-name">Profil</span>
     </button>
     <header class="brand">
-      <div class="brand-logo" aria-hidden="true">
-        <span>A</span><span>B</span><span>C</span>
-      </div>
+      <div class="logo-wheel" aria-hidden="true"></div>
       <h1>Harf Çarkı</h1>
       <p class="tagline">Her harfe bir soru. Yaz ya da söyle!</p>
     </header>
 
-    <button id="btn-leaderboard" class="lb-btn" type="button">🏆 Liderlik Tablosu</button>
+    <div class="menu-actions">
+      <button id="btn-online" class="lb-btn online-btn" type="button">👥 Arkadaşlarla Oyna</button>
+      <button id="btn-leaderboard" class="lb-btn" type="button">🏆 Liderlik</button>
+    </div>
 
     <h2 class="section-title">Kategori seç</h2>
     <div id="category-grid" class="category-grid"></div>
@@ -151,6 +158,65 @@
     <p id="voice-warning" class="voice-warning hidden"></p>
   </section>
 
+  <!-- ARKADAŞLARLA OYNA -->
+  <section id="screen-online" class="screen">
+    <div class="topbar">
+      <button id="btn-online-back" class="icon-btn" aria-label="Geri">←</button>
+      <div class="topbar-title">👥 Arkadaşlarla Oyna</div>
+      <span style="width:42px"></span>
+    </div>
+    <p class="online-intro">Oda kur, kodu arkadaşlarına gönder. Herkes aynı soruları aynı anda çözer; skorlar canlı görünür, en çok bilen kazanır!</p>
+
+    <div id="online-need-account" class="online-card hidden">
+      <p>Online oynamak için <b>e-posta hesabıyla</b> giriş yapman gerekiyor. Misafir profiller online odalara katılamaz.</p>
+      <button id="btn-online-login" class="btn btn-ok wide" type="button">GİRİŞ YAP / HESAP AÇ</button>
+    </div>
+
+    <div id="online-forms">
+      <div class="online-card">
+        <h3>🎪 Oda kur</h3>
+        <label class="setting"><span>Kategori</span><select id="on-cat"></select></label>
+        <label class="setting"><span>Süre</span><select id="on-time"></select></label>
+        <div class="setting"><span>Cevaplama</span>
+          <div id="on-mode" class="seg">
+            <button type="button" data-mode="choice" class="sel">🔤 Şıklı</button>
+            <button type="button" data-mode="free">⌨️ Yazarak</button>
+          </div>
+        </div>
+        <button id="btn-create-room" class="btn btn-ok wide" type="button">ODA KUR</button>
+      </div>
+
+      <div class="divider"><span>ya da</span></div>
+
+      <form id="join-form" class="online-card" autocomplete="off">
+        <h3>🔑 Odaya katıl</h3>
+        <input id="on-code" class="code-input" type="text" inputmode="text" maxlength="5" placeholder="KOD" autocapitalize="characters" spellcheck="false" />
+        <button id="btn-join-room" class="btn btn-pass wide" type="submit">KATIL</button>
+      </form>
+    </div>
+    <p id="online-msg" class="auth-msg bad" aria-live="polite"></p>
+  </section>
+
+  <!-- ODA (LOBİ) -->
+  <section id="screen-lobby" class="screen">
+    <div class="topbar">
+      <button id="btn-lobby-leave" class="icon-btn" aria-label="Odadan çık">✕</button>
+      <div class="topbar-title">Oyun Odası</div>
+      <span style="width:42px"></span>
+    </div>
+    <div class="lobby-code-box">
+      <span class="lobby-code-label">Oda kodu</span>
+      <div id="lobby-code" class="lobby-code">-----</div>
+      <button id="btn-lobby-share" class="chip-btn" type="button">📤 Arkadaşlarını davet et</button>
+    </div>
+    <p id="lobby-info" class="lobby-info"></p>
+    <h3 class="section-title">Oyuncular · <span id="lobby-count">0</span></h3>
+    <ul id="lobby-players" class="lobby-players"></ul>
+    <p id="lobby-hint" class="lobby-hint"></p>
+    <button id="btn-lobby-start" class="btn btn-ok wide hidden" type="button">OYUNU BAŞLAT</button>
+    <p id="lobby-wait" class="lobby-wait hidden">Oda kurucusunun başlatması bekleniyor<span class="dots"><i>.</i><i>.</i><i>.</i></span></p>
+  </section>
+
   <!-- OYUN -->
   <section id="screen-game" class="screen">
     <div class="topbar">
@@ -158,6 +224,7 @@
       <div id="game-category" class="topbar-title"></div>
       <button id="btn-pause" class="icon-btn" aria-label="Duraklat">❚❚</button>
     </div>
+    <div id="live-board" class="live-board hidden" aria-label="Canlı skorlar"></div>
 
     <div class="game-layout">
       <div class="wheel-wrap">
@@ -220,6 +287,10 @@
         <div class="big pass"><b id="res-empty">0</b><span>Boş</span></div>
       </div>
       <p id="res-best" class="res-best"></p>
+      <div id="online-rank" class="online-rank hidden">
+        <ol id="online-rank-list" class="lb-list"></ol>
+        <p id="online-rank-note" class="lb-note"></p>
+      </div>
       <div class="actions">
         <button id="btn-menu" class="btn btn-pass">MENÜ</button>
         <button id="btn-again" class="btn btn-ok">TEKRAR OYNA</button>
@@ -273,6 +344,7 @@
   <script src="questions-choices.js"></script>
   <script src="firebase-config.js"></script>
   <script src="auth.js"></script>
+  <script src="online.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

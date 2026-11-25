@@ -15,9 +15,41 @@ function profileKey() { return "profile." + (Auth.user ? Auth.user.uid : "none")
 function getProfile() {
   const u = Auth.user || { name: "Oyuncu" };
   const p = store.get(profileKey(), null) || {};
-  return { name: p.name || u.name || "Oyuncu", avatar: p.avatar || "🙂", games: p.games || 0, correct: p.correct || 0, answered: p.answered || 0, best: p.best || {}, sik: p.sik || { games: 0, correct: 0, answered: 0, best: {} } };
+  return { name: p.name || u.name || "Oyuncu", avatar: p.avatar || "🙂", games: p.games || 0, correct: p.correct || 0, answered: p.answered || 0, best: p.best || {}, photo: p.photo || "", sik: p.sik || { games: 0, correct: 0, answered: 0, best: {} } };
 }
 function saveProfile(p) { store.set(profileKey(), p); }
+
+// Profil fotoğrafı: küçültülmüş JPEG (data URL) ya da emoji avatar
+const validPhoto = (s) => typeof s === "string" && s.length < 60000 && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(s);
+function paintAvatar(el, p) {
+  el.textContent = "";
+  el.classList.toggle("has-photo", validPhoto(p && p.photo));
+  if (validPhoto(p && p.photo)) {
+    const img = document.createElement("img");
+    img.src = p.photo; img.alt = ""; img.decoding = "async";
+    el.appendChild(img);
+  } else el.textContent = (p && p.avatar) || "🙂";
+}
+// Seçilen resmi ortadan kare kırpıp 160 piksele küçült
+function photoFromFile(file) {
+  return new Promise((resolve, reject) => {
+    if (!file || !/^image\//.test(file.type)) return reject(new Error("Lütfen bir resim seç."));
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const S = 160, side = Math.min(img.naturalWidth, img.naturalHeight);
+      const cv = document.createElement("canvas"); cv.width = cv.height = S;
+      const ctx = cv.getContext("2d");
+      ctx.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, S, S);
+      URL.revokeObjectURL(url);
+      let q = 0.82, out = cv.toDataURL("image/jpeg", q);
+      while (out.length > 45000 && q > 0.4) { q -= 0.1; out = cv.toDataURL("image/jpeg", q); }
+      resolve(out);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Resim açılamadı.")); };
+    img.src = url;
+  });
+}
 
 /* ================= BULUT (Firestore) ================= */
 const CAT_IDS = () => [...CATEGORIES.map((c) => c.id), "karisik"];
@@ -36,6 +68,7 @@ const Cloud = {
       games, answered,
       correct: Math.min(Math.max(0, p.correct | 0), answered),
       best,
+      ...(validPhoto(p.photo) ? { photo: p.photo } : {}),
     };
   },
   // Girişte buluttaki kaydı çek, cihazdakiyle birleştir
@@ -52,6 +85,7 @@ const Cloud = {
         Object.entries(local.best).forEach(([k, v]) => { best[k] = Math.max(best[k] || 0, v); });
         merged = {
           sik: local.sik,
+          photo: local.photo || (validPhoto(c.photo) ? c.photo : ""),
           name: c.name || local.name,
           avatar: c.avatar || local.avatar,
           games: useCloud ? c.games : local.games,
@@ -79,7 +113,14 @@ const Cloud = {
         data.correct = Math.min(data.correct, data.answered);
         data.games = step;
       }
-      await this.ref().set({ ...data, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+      try {
+        await this.ref().set({ ...data, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+      } catch (e) {
+        // Kurallar fotoğrafı henüz kabul etmiyorsa skorlar yine de kaydedilsin
+        if (!data.photo || e.code !== "permission-denied") throw e;
+        delete data.photo;
+        await this.ref().set({ ...data, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+      }
       this.status = "synced";
     } catch (e) {
       console.warn("Buluta yazılamadı:", e);
@@ -535,13 +576,19 @@ function countUp(el, to, ms = 700) {
   requestAnimationFrame(step);
 }
 
-function startGame(cat) {
+function startGame(cat, opts) {
   stopListening();
+  opts = opts || {};
+  game.online = !!opts.online;
   game.cat = cat;
-  game.items = buildQuestions(cat);
+  game.items = opts.items || buildQuestions(cat);
   game.idx = 0;
-  game.total = parseInt($("opt-time").value, 10);
-  game.level = $("opt-time").selectedOptions[0].textContent.split("·")[0].trim();
+  game.elapsed = 0;
+  game.total = opts.total !== undefined ? opts.total : parseInt($("opt-time").value, 10);
+  const lvl = [...$("opt-time").options].find((o) => o.value === String(game.total)) || $("opt-time").selectedOptions[0];
+  game.level = game.online ? "👥 Online" : lvl.textContent.split("·")[0].trim();
+  $("btn-pause").classList.toggle("hidden", game.online);
+  $("online-rank").classList.add("hidden");
   game.time = game.total;
   game.paused = false;
   game.over = false;
@@ -559,7 +606,9 @@ function startGame(cat) {
 }
 
 function tick() {
-  if (game.paused || game.over || !game.total) return;
+  if (game.paused || game.over) return;
+  game.elapsed = (game.elapsed || 0) + 1;
+  if (!game.total) return;
   game.time--;
   updateTimer();
   if (game.time <= 0) endGame("Süre doldu!");
@@ -634,6 +683,7 @@ function pass() {
 function advance(delay) {
   game.busy = true;
   paintBubbles();
+  if (game.online) Online.report(false);
   setTimeout(() => {
     if (game.over) return;
     const next = findNext();
@@ -661,7 +711,7 @@ function flash(msg, cls) {
 }
 
 function setPaused(p) {
-  if (game.over) return;
+  if (game.over || (p && game.online)) return;
   game.paused = p;
   $("pause-overlay").classList.toggle("hidden", !p);
   if (p) { stopListening(); stopSpeaking(); }
@@ -681,6 +731,21 @@ function endGame(title) {
   setTimeout(() => { countUp($("res-correct"), c); countUp($("res-wrong"), w); countUp($("res-empty"), e); }, 250);
   $("res-best").classList.remove("record");
 
+  if (game.online) {
+    // Online turda kişisel rekorlar değişmez; sıralama canlı gösterilir
+    Online.report(true);
+    $("res-best").textContent = "Sıralama aşağıda 👇";
+    $("btn-again").textContent = "ODAYA DÖN";
+    $("btn-menu").textContent = "ODADAN ÇIK";
+    $("btn-result-lb").classList.add("hidden");
+    renderResultList();
+    showScreen("result");
+    Online.renderRanking();
+    return;
+  }
+  $("btn-again").textContent = "TEKRAR OYNA";
+  $("btn-menu").textContent = "MENÜ";
+  $("btn-result-lb").classList.remove("hidden");
   const p = getProfile();
   const sik = game.mode === "choice";
   const st = sik ? p.sik : p;
@@ -697,6 +762,11 @@ function endGame(title) {
   saveProfile(p);
   if (!sik) Cloud.push(p);
 
+  renderResultList();
+  showScreen("result");
+  renderMenu();
+}
+function renderResultList() {
   $("result-list").innerHTML = game.items.map((it, i) =>
     '<li class="' + it.status + '" style="--i:' + i + '"><div class="rl">' + it.letter + "</div><div>" +
     '<div class="rq">' + escapeHtml(it.q.q) + "</div>" +
@@ -704,8 +774,6 @@ function endGame(title) {
     (it.status === "wrong" ? '<div class="ry">Senin cevabın: ' + escapeHtml(it.given) + "</div>" : "") +
     "</div></li>"
   ).join("");
-  showScreen("result");
-  renderMenu();
 }
 
 function escapeHtml(s) {
@@ -721,7 +789,7 @@ function showScreen(name) {
 
 function renderMenu() {
   const p = getProfile();
-  $("chip-avatar").textContent = p.avatar;
+  paintAvatar($("chip-avatar"), p);
   $("chip-name").textContent = p.name;
   const grid = $("category-grid");
   grid.innerHTML = "";
@@ -789,13 +857,95 @@ document.addEventListener("keydown", (e) => {
   if (k !== undefined) { e.preventDefault(); pickChoice(k); }
 });
 
+/* ---------- Arkadaşlarla oyna ---------- */
+function openOnline(prefill) {
+  const sel = $("on-cat");
+  if (!sel.options.length) {
+    [...CATEGORIES, MIXED].forEach((c) => { const o = document.createElement("option"); o.value = c.id; o.textContent = c.icon + " " + c.name; sel.appendChild(o); });
+    sel.value = MIXED.id;
+    $("on-time").innerHTML = $("opt-time").innerHTML;
+    $("on-time").value = "180";
+  }
+  const ok = Online.canPlay();
+  $("online-need-account").classList.toggle("hidden", ok);
+  $("online-forms").classList.toggle("hidden", !ok);
+  $("online-msg").textContent = "";
+  if (prefill) $("on-code").value = prefill;
+  showScreen("online");
+}
+async function onlineRun(btn, fn) {
+  $("online-msg").textContent = "";
+  btn.disabled = true;
+  try { await fn(); } catch (e) { $("online-msg").textContent = e.message; }
+  btn.disabled = false;
+}
+$("btn-online").addEventListener("click", () => openOnline());
+$("btn-online-back").addEventListener("click", () => showScreen("menu"));
+$("btn-online-login").addEventListener("click", async () => { await Auth.logout(); afterLogin(); });
+document.querySelectorAll("#on-mode button").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll("#on-mode button").forEach((x) => x.classList.toggle("sel", x === b));
+}));
+$("btn-create-room").addEventListener("click", (e) => onlineRun(e.currentTarget, () => {
+  const mode = document.querySelector("#on-mode button.sel").dataset.mode;
+  return Online.create($("on-cat").value, parseInt($("on-time").value, 10), mode);
+}));
+$("join-form").addEventListener("submit", (e) => { e.preventDefault(); onlineRun($("btn-join-room"), () => Online.join($("on-code").value)); });
+$("on-code").addEventListener("input", (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5); });
+$("btn-lobby-leave").addEventListener("click", async () => {
+  if (!confirm(Online.isHost() ? "Odayı kapatıp çıkılsın mı?" : "Odadan çıkılsın mı?")) return;
+  await Online.leave(); renderMenu(); showScreen("menu");
+});
+$("btn-lobby-share").addEventListener("click", () => Online.share());
+$("btn-lobby-start").addEventListener("click", () => Online.start());
+
+/* ---------- Logo: dönen mini harf çarkı ---------- */
+function buildLogoWheels() {
+  document.querySelectorAll(".logo-wheel").forEach((w) => {
+    if (w.childElementCount) return;
+    const ring = document.createElement("div"); ring.className = "lw-ring";
+    const n = LETTERS.length;
+    const marks = { 2: "g", 5: "g", 6: "r", 9: "g", 13: "b", 17: "g", 18: "g", 22: "r", 25: "g" };
+    LETTERS.forEach((L, i) => {
+      const a = (-90 + (360 / n) * i) * (Math.PI / 180);
+      const b = document.createElement("span");
+      b.className = "lw-b" + (marks[i] ? " " + marks[i] : "");
+      b.style.left = 50 + 45.5 * Math.cos(a) + "%";
+      b.style.top = 50 + 45.5 * Math.sin(a) + "%";
+      b.style.setProperty("--i", i);
+      const t = document.createElement("i"); t.textContent = L;
+      b.appendChild(t);
+      ring.appendChild(b);
+    });
+    const c = document.createElement("div"); c.className = "lw-center";
+    const l = document.createElement("b"); l.textContent = "A";
+    c.appendChild(l);
+    w.append(ring, c);
+  });
+  if (reducedMotion()) return;
+  let k = 0;
+  setInterval(() => {
+    if (document.hidden) return;
+    k = (k + 1) % LETTERS.length;
+    document.querySelectorAll(".screen.active .lw-center b").forEach((b) => { b.textContent = LETTERS[k]; replay(b, "flip"); });
+  }, 1500);
+}
+buildLogoWheels();
+
 /* ---------- Profil ekranı ---------- */
 let pendingAvatar = null;
+let pendingPhoto = "";
+function paintProfileAvatar() {
+  paintAvatar($("profile-avatar"), { avatar: pendingAvatar, photo: pendingPhoto });
+  $("btn-photo-remove").classList.toggle("hidden", !pendingPhoto);
+  $("btn-photo").textContent = pendingPhoto ? "📷 Fotoğrafı değiştir" : "📷 Fotoğraf ekle";
+}
 function openProfile() {
   const p = getProfile();
   const u = Auth.user;
   pendingAvatar = p.avatar;
-  $("profile-avatar").textContent = p.avatar;
+  pendingPhoto = p.photo || "";
+  $("photo-msg").textContent = "";
+  paintProfileAvatar();
   $("profile-name").value = p.name;
   const how = { google: "Google hesabı", facebook: "Facebook hesabı", email: "E-posta hesabı", local: "Misafir · yalnızca bu cihazda" }[u.provider] || "";
   $("profile-account").textContent = how + (u.email ? " · " + u.email : "");
@@ -814,7 +964,7 @@ function openProfile() {
     b.type = "button"; b.textContent = a;
     if (a === pendingAvatar) b.classList.add("sel");
     b.onclick = () => {
-      pendingAvatar = a; $("profile-avatar").textContent = a;
+      pendingAvatar = a; pendingPhoto = ""; paintProfileAvatar();
       $("avatar-grid").querySelectorAll("button").forEach((x) => x.classList.toggle("sel", x === b));
     };
     $("avatar-grid").appendChild(b);
@@ -866,6 +1016,12 @@ function afterLogin() {
   renderMenu();
   showScreen("menu");
   Cloud.pull().then(renderMenu);
+  const invite = new URLSearchParams(location.search).get("oda");
+  if (invite) {
+    history.replaceState(null, "", location.pathname);
+    openOnline(invite.toUpperCase().slice(0, 5));
+    if (Online.canPlay()) onlineRun($("btn-join-room"), () => Online.join(invite));
+  }
 }
 
 /* ---------- Liderlik tablosu ---------- */
@@ -910,7 +1066,7 @@ async function loadLeaderboard() {
       const d = doc.data();
       const score = lbTab === "toplam" ? d.correct : (d.best || {})[lbTab];
       if (!score) return;
-      rows.push({ id: doc.id, name: d.name, avatar: d.avatar, score, games: d.games });
+      rows.push({ id: doc.id, name: d.name, avatar: d.avatar, photo: d.photo, score, games: d.games });
     });
     list.innerHTML = "";
     if (!rows.length) { list.innerHTML = '<li class="empty">Henüz kimse yok. İlk sen ol! 🚀</li>'; return; }
@@ -919,7 +1075,7 @@ async function loadLeaderboard() {
       const li = document.createElement("li");
       if (r.id === myId) li.classList.add("me");
       const rank = document.createElement("span"); rank.className = "lb-rank"; rank.textContent = medals[i] || String(i + 1);
-      const ava = document.createElement("span"); ava.className = "lb-ava"; ava.textContent = r.avatar || "🙂";
+      const ava = document.createElement("span"); ava.className = "lb-ava"; paintAvatar(ava, r);
       const name = document.createElement("span"); name.className = "lb-name";
       name.textContent = (r.name || "Oyuncu") + (r.id === myId ? " (sen)" : "");
       const small = document.createElement("small"); small.textContent = (r.games || 0) + " oyun"; name.appendChild(small);
@@ -982,15 +1138,25 @@ $("btn-repeat").addEventListener("click", () => { const it = game.items[game.idx
 $("btn-pause").addEventListener("click", () => setPaused(true));
 $("btn-resume").addEventListener("click", () => { setPaused(false); if (!game.busy) showQuestion(); });
 $("btn-quit").addEventListener("click", () => {
+  if (game.online) {
+    if (!game.over && !confirm("Turu bitirip odaya dönülsün mü?")) return;
+    if (!game.over) endGame("Turu bitirdin");
+    Online.backToLobby();
+    return;
+  }
   if (!game.over && !confirm("Oyundan çıkılsın mı?")) return;
   game.over = true; clearInterval(game.timerId); stopListening(); stopSpeaking();
   showScreen("menu");
 });
-$("btn-again").addEventListener("click", () => askMode(game.cat));
-$("btn-menu").addEventListener("click", () => showScreen("menu"));
+$("btn-again").addEventListener("click", () => game.online && Online.active() ? Online.backToLobby() : askMode(game.cat));
+$("btn-menu").addEventListener("click", async () => {
+  if (game.online && Online.active()) { await Online.leave(); game.online = false; }
+  renderMenu();
+  showScreen("menu");
+});
 $("btn-howto").addEventListener("click", () => $("howto").classList.remove("hidden"));
 $("btn-howto-close").addEventListener("click", () => $("howto").classList.add("hidden"));
-document.addEventListener("visibilitychange", () => { if (document.hidden && !game.over && !game.paused) setPaused(true); });
+document.addEventListener("visibilitychange", () => { if (document.hidden && !game.over && !game.paused && !game.online) setPaused(true); });
 
 // Liderlik
 $("btn-leaderboard").addEventListener("click", () => openLeaderboard());
@@ -1001,10 +1167,22 @@ $("btn-lb-refresh").addEventListener("click", loadLeaderboard);
 // Profil
 $("btn-profile").addEventListener("click", openProfile);
 $("btn-profile-back").addEventListener("click", () => showScreen("menu"));
+$("btn-photo").addEventListener("click", () => $("photo-input").click());
+$("profile-avatar").addEventListener("click", () => $("photo-input").click());
+$("photo-input").addEventListener("change", async (e) => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if (!f) return;
+  $("photo-msg").textContent = "Hazırlanıyor…";
+  try { pendingPhoto = await photoFromFile(f); $("photo-msg").textContent = "Beğendiysen KAYDET'e bas."; paintProfileAvatar(); }
+  catch (err) { $("photo-msg").textContent = err.message; }
+});
+$("btn-photo-remove").addEventListener("click", () => { pendingPhoto = ""; $("photo-msg").textContent = ""; paintProfileAvatar(); });
 $("btn-profile-save").addEventListener("click", () => {
   const p = getProfile();
   p.name = $("profile-name").value.trim().slice(0, 20) || p.name;
   p.avatar = pendingAvatar || p.avatar;
+  p.photo = pendingPhoto || "";
   saveProfile(p);
   Cloud.push(p);
   renderMenu();
