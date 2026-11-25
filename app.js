@@ -383,6 +383,10 @@ function renderWheel() {
     b.style.top = 50 + 45 * Math.sin(ang) + "%";
     wheel.appendChild(b);
   });
+  // giriş animasyonu bir kez oynasın; sonra sınıf değişimlerinde tekrar etmesin
+  wheel.classList.add("intro");
+  clearTimeout(renderWheel.t);
+  renderWheel.t = setTimeout(() => wheel.classList.remove("intro"), 1300);
 }
 function paintBubbles() {
   game.items.forEach((it, i) => {
