@@ -436,15 +436,25 @@ function buildChoices(it) {
   const hand = typeof WRONG_CHOICES !== "undefined" && WRONG_CHOICES[q.catId] && WRONG_CHOICES[q.catId][q.a];
   if (hand && hand.length >= 2) return shuffle([q.a, hand[0], hand[1]]);
   const taken = new Set([q.a, ...(q.alt || [])].map(fold));
+  // Soru metni benzer olan sorulardan (ör. "... başkenti", "Plaka kodu ... olan il") yanlış şık seçilir,
+  // böylece şıklar aynı türden olur (şehir–şehir, ülke–ülke).
+  const STOP = new Set(["olan", "ile", "için", "bir", "ünlü", "yapılan", "verilen", "adı", "diğer", "eden", "olarak", "gibi", "kadar", "daha"]);
+  const words = (s) => new Set(normalize(s).split(/\s+/).filter((w) => w.length >= 3 && !STOP.has(w)));
+  const qw = words(q.q);
+  // Türkçede sorunun son kelimesi neyin sorulduğunu söyler: "... başkenti", "... yazarı", "... olan il"
+  const lastWord = (s) => normalize(s).trim().split(/\s+/).pop();
+  const qLast = lastWord(q.q);
   const pick = (cats) => {
     const out = [];
     cats.forEach((c) => c.questions.forEach((o) => {
       if (o.l !== it.letter || !!o.c !== contains) return;
       const f = fold(o.a);
-      if (taken.has(f) || !fitsRule(o.a, it.letter, contains) || out.some((x) => fold(x) === f)) return;
-      out.push(o.a);
+      if (taken.has(f) || !fitsRule(o.a, it.letter, contains) || out.some((x) => fold(x.a) === f)) return;
+      let score = lastWord(o.q) === qLast ? 3 : 0;
+      words(o.q).forEach((w) => { if (qw.has(w)) score++; });
+      out.push({ a: o.a, score: score + Math.random() * 0.9 });
     }));
-    return shuffle(out);
+    return out.sort((x, y) => y.score - x.score).map((x) => x.a);
   };
   // Önce aynı kategoriden, yetmezse diğerlerinden
   let wrong = pick(CATEGORIES.filter((c) => c.id === q.catId)).slice(0, 2);
