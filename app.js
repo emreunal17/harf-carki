@@ -380,6 +380,9 @@ function shuffle(arr) {
 }
 function buildChoices(it) {
   const q = it.q, contains = !!q.c;
+  // Elle hazırlanmış, soruyla aynı türden yanlış şıklar (questions-choices.js)
+  const hand = typeof WRONG_CHOICES !== "undefined" && WRONG_CHOICES[q.catId] && WRONG_CHOICES[q.catId][q.a];
+  if (hand && hand.length >= 2) return shuffle([q.a, hand[0], hand[1]]);
   const taken = new Set([q.a, ...(q.alt || [])].map(fold));
   const pick = (cats) => {
     const out = [];
