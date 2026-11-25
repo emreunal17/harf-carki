@@ -5,7 +5,17 @@
 //
 // Boş (null) bırakılırsa oyun yalnızca misafir/yerel profil ile çalışır.
 
-window.FIREBASE_CONFIG = null;
+window.FIREBASE_CONFIG = {
+  apiKey: "AIzaSyChYQGHqcGIRr9PXPRE7S28v31t82Wcg1A",
+  authDomain: "harf-carki-69e45.firebaseapp.com",
+  projectId: "harf-carki-69e45",
+  storageBucket: "harf-carki-69e45.firebasestorage.app",
+  messagingSenderId: "221123781277",
+  appId: "1:221123781277:web:335897b7ee5804cac26a74",
+};
+
+// Firebase konsolunda açılan giriş yöntemleri. Açtıkça true yapın.
+window.AUTH_PROVIDERS = { email: true, google: false, facebook: false };
 
 /* Örnek:
 window.FIREBASE_CONFIG = {

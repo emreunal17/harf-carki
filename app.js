@@ -485,10 +485,15 @@ let registerMode = false;
 function setAuthMsg(msg, cls) { const m = $("auth-msg"); m.textContent = msg; m.className = "auth-msg " + (cls || ""); }
 function setupLoginScreen() {
   const on = Auth.enabled;
+  const prov = window.AUTH_PROVIDERS || { email: true, google: true, facebook: true };
+  $("btn-google").classList.toggle("hidden", on && !prov.google);
+  $("btn-facebook").classList.toggle("hidden", on && !prov.facebook);
   $("btn-google").disabled = !on;
   $("btn-facebook").disabled = !on;
   $("email-form").classList.toggle("disabled", !on);
   $("auth-setup-note").classList.toggle("hidden", on);
+  const anySocial = on && (prov.google || prov.facebook);
+  document.querySelector("#screen-login .auth-card .divider").classList.toggle("hidden", on && !anySocial);
 }
 function toggleRegister(force) {
   registerMode = force ?? !registerMode;
